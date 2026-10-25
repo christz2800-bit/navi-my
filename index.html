@@ -1,151 +1,77 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ms">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#081522">
-  <title>NAVI MY v0.2</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <style>
-    :root { color-scheme: dark; --bg:#081522; --panel:#142638; --line:#2a4053; --amber:#ffb52e; --muted:#bdc9d5; }
-    * { box-sizing:border-box; }
-    body { margin:0; padding:20px; padding-top:max(20px, env(safe-area-inset-top)); background:var(--bg); color:#fff; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; }
-    .app { max-width:560px; margin:0 auto; }
-    .eyebrow { color:var(--amber); font-size:11px; font-weight:800; letter-spacing:2px; }
-    h1 { color:var(--amber); font-size:32px; margin:7px 0; letter-spacing:1px; }
-    .intro { color:var(--muted); line-height:1.45; margin:0 0 18px; }
-    label { display:block; margin:14px 0 7px; font-size:14px; font-weight:700; }
-    input,button { width:100%; padding:14px; border-radius:12px; font-size:16px; }
-    input { background:var(--panel); border:1px solid #405367; color:#fff; }
-    button { border:0; font-weight:800; cursor:pointer; }
-    .primary { background:var(--amber); color:var(--bg); margin-top:10px; }
-    .secondary { background:#20364a; color:#fff; border:1px solid #405367; margin-top:9px; }
-    #status { margin:14px 0; padding:13px 14px; background:var(--panel); border:1px solid var(--line); border-radius:12px; color:#e8eef4; line-height:1.45; font-size:14px; }
-    #map { height:48vh; min-height:320px; max-height:560px; border:1px solid #344b60; border-radius:16px; overflow:hidden; background:#d9e3e7; }
-    .foot { color:#91a4b5; font-size:12px; line-height:1.5; margin:14px 0 4px; }
-    .leaflet-control-attribution { font-size:10px !important; }
-    .leaflet-popup-content-wrapper,.leaflet-popup-tip { background:#142638; color:#fff; }
-    .leaflet-popup-content { line-height:1.4; }
-    @media (max-width:380px) { body { padding:14px; } #map { height:44vh; } }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#081522">
+<title>NAVI MY v0.3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{color-scheme:dark;--bg:#081522;--panel:#142638;--panel2:#20364a;--amber:#ffb52e;--muted:#b8c5d3}
+*{box-sizing:border-box}body{margin:0;padding:20px;padding-top:max(20px,env(safe-area-inset-top));background:var(--bg);color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{max-width:560px;margin:0 auto}.eyebrow{color:var(--amber);font-size:11px;letter-spacing:3px;font-weight:800}
+h1{color:var(--amber);font-size:32px;margin:18px 0 12px}h1 small{font-size:17px;color:var(--muted)}
+.intro{color:var(--muted);line-height:1.45;font-size:16px;margin:0 0 24px}label{display:block;margin:14px 0 7px;font-weight:700}
+input,button{width:100%;padding:14px;border-radius:15px;font-size:16px}input{background:var(--panel);border:1px solid #42566b;color:white}
+button{border:0;font-weight:800;cursor:pointer;margin-top:12px}.primary{background:var(--amber);color:#101820}.secondary{background:var(--panel2);color:#fff;border:1px solid #40566b}
+#status{margin:14px 0;padding:13px 14px;background:var(--panel);border:1px solid #2c4053;border-radius:15px;color:#dce5ee;line-height:1.45}
+#summary{display:none;margin:12px 0;padding:14px;background:#132b25;border:1px solid #2d6655;border-radius:15px;line-height:1.5}#summary strong{color:#9af0c5}
+#map{height:48vh;min-height:320px;max-height:620px;border-radius:22px;overflow:hidden;border:1px solid #40566b;margin-top:16px}
+.foot{color:#91a4b5;font-size:12px;line-height:1.5;margin:14px 0 8px}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#142638;color:#fff}.leaflet-popup-content{line-height:1.45}
+</style>
 </head>
-<body>
-<main class="app">
-  <div class="eyebrow">MALAYSIA • NAVIGATION CONCEPT</div>
-  <h1>NAVI MY <span style="font-size:13px;color:#bdc9d5;letter-spacing:0">v0.2</span></h1>
-  <p class="intro">Peta sebenar, carian tempat dan lokasi semasa — langkah pertama ke arah navigasi Malaysia.</p>
-
-  <label for="destination">Cari destinasi</label>
-  <input id="destination" type="search" placeholder="Contoh: Kluang Mall, Johor" autocomplete="off">
-  <button class="primary" id="searchButton">CARI DESTINASI</button>
-  <button class="secondary" id="locateButton">◎ LOKASI SAYA</button>
-  <div id="status" role="status" aria-live="polite">Memuatkan peta… Jika peta tidak muncul, semak sambungan internet.</div>
-  <div id="map" aria-label="Peta interaktif NAVI MY"></div>
-  <p class="foot">Prototaip pembelajaran. Memerlukan sambungan internet dan sebaiknya dibuka melalui laman HTTPS untuk akses lokasi. Peta © OpenStreetMap contributors. Belum menyediakan pengiraan laluan atau arahan belok demi belok.</p>
+<body><main class="app">
+<div class="eyebrow">MALAYSIA · NAVIGATION CONCEPT</div>
+<h1>NAVI MY <small>v0.3</small></h1>
+<p class="intro">Peta sebenar, carian tempat, lokasi semasa dan laluan perjalanan — langkah seterusnya ke arah navigasi Malaysia.</p>
+<label for="destination">Cari destinasi</label>
+<input id="destination" placeholder="Contoh: Kluang Mall, Johor" autocomplete="street-address">
+<button class="primary" id="search">CARI DESTINASI</button>
+<button class="secondary" id="locate">◎ LOKASI SAYA</button>
+<button class="secondary" id="route">↗ BINA LALUAN</button>
+<div id="status" role="status" aria-live="polite">Peta sedia. Cari destinasi atau tekan “LOKASI SAYA”. Dapatkan lokasi semasa dan cari destinasi sebelum membina laluan.</div>
+<div id="summary"></div><div id="map"></div>
+<p class="foot">Prototaip pembelajaran. Memerlukan internet dan kebenaran GPS. Jarak dan masa ialah anggaran; trafik semasa belum diambil kira. Peta © OpenStreetMap contributors.</p>
 </main>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-(function () {
-  const status = document.getElementById('status');
-  const input = document.getElementById('destination');
-  const searchButton = document.getElementById('searchButton');
-  const locateButton = document.getElementById('locateButton');
-
-  if (!window.L) {
-    status.textContent = 'Pustaka peta gagal dimuatkan. Pastikan internet aktif dan buka semula halaman ini melalui HTTPS.';
-    return;
-  }
-
-  const map = L.map('map', { zoomControl: true }).setView([2.030, 103.318], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-  }).addTo(map);
-
-  let userMarker = null;
-  let destinationMarker = null;
-  let userCircle = null;
-
-  status.textContent = 'Peta sedia. Cari tempat atau tekan “LOKASI SAYA”.';
-
-  function locateUser() {
-    if (!navigator.geolocation) {
-      status.textContent = 'Pelayar ini tidak menyokong GPS/lokasi.';
-      return;
-    }
-    status.textContent = 'Meminta kebenaran lokasi… Benarkan akses lokasi jika diminta.';
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const accuracy = Math.round(position.coords.accuracy);
-        if (userMarker) map.removeLayer(userMarker);
-        if (userCircle) map.removeLayer(userCircle);
-        userMarker = L.marker([lat, lon]).addTo(map).bindPopup('Lokasi semasa anda');
-        userCircle = L.circle([lat, lon], { radius: accuracy, color: '#ffb52e', fillOpacity: 0.12 }).addTo(map);
-        map.setView([lat, lon], 16);
-        userMarker.openPopup();
-        status.textContent = 'Lokasi diperoleh. Anggaran ketepatan GPS: ' + accuracy + ' meter.';
-      },
-      function (error) {
-        const messages = {
-          1: 'Akses lokasi ditolak. Semak tetapan kebenaran lokasi pelayar.',
-          2: 'Lokasi tidak dapat ditentukan. Cuba di tempat yang lebih terbuka.',
-          3: 'Permintaan lokasi mengambil masa terlalu lama. Cuba lagi.'
-        };
-        status.textContent = messages[error.code] || 'Lokasi tidak tersedia. Cuba lagi.';
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-    );
-  }
-
-  async function searchDestination() {
-    const query = input.value.trim();
-    if (!query) {
-      status.textContent = 'Masukkan nama tempat atau alamat dahulu.';
-      input.focus();
-      return;
-    }
-    status.textContent = 'Mencari “' + query + '”…';
-    searchButton.disabled = true;
-    searchButton.textContent = 'SEDANG MENCARI…';
-    try {
-      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=my&q=' + encodeURIComponent(query);
-      const response = await fetch(url, { headers: { 'Accept-Language': 'ms,en' } });
-      if (!response.ok) throw new Error('search');
-      const results = await response.json();
-      if (!results.length) {
-        status.textContent = 'Destinasi tidak ditemui. Cuba nama yang lebih lengkap, contohnya “Kluang Mall, Johor”.';
-        return;
-      }
-      const place = results[0];
-      const point = [Number(place.lat), Number(place.lon)];
-      if (destinationMarker) map.removeLayer(destinationMarker);
-      destinationMarker = L.marker(point).addTo(map).bindPopup('<strong>Destinasi</strong><br>' + escapeHtml(place.display_name));
-      map.setView(point, 16);
-      destinationMarker.openPopup();
-      status.textContent = 'Destinasi ditemui dan ditanda pada peta. Pengiraan laluan akan ditambah dalam versi seterusnya.';
-    } catch (error) {
-      status.textContent = 'Carian tidak berjaya. Semak internet atau cuba lagi kemudian. Servis carian awam mempunyai had penggunaan.';
-    } finally {
-      searchButton.disabled = false;
-      searchButton.textContent = 'CARI DESTINASI';
-    }
-  }
-
-  function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, function (c) {
-      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
-    });
-  }
-
-  searchButton.addEventListener('click', searchDestination);
-  input.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter') searchDestination();
-  });
-  locateButton.addEventListener('click', locateUser);
+(()=> {
+const $=id=>document.getElementById(id), status=$('status'), summary=$('summary');
+const map=L.map('map').setView([2.0226,103.3178],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+let here=null,place=null,hereMarker=null,placeMarker=null,routeLine=null;
+const say=t=>status.textContent=t;
+const clearRoute=()=>{if(routeLine){map.removeLayer(routeLine);routeLine=null}summary.style.display='none';summary.textContent=''};
+const safe=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const distance=m=>m>=1000?(m/1000).toFixed(1)+' km':Math.round(m)+' m';
+const duration=s=>{let m=Math.round(s/60);return m<60?m+' min':Math.floor(m/60)+' jam'+(m%60?' '+m%60+' min':'')};
+$('search').onclick=async()=>{
+ const q=$('destination').value.trim();if(!q){say('Masukkan nama destinasi dahulu.');return}
+ say('Sedang mencari destinasi…');
+ try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(q),{headers:{'Accept-Language':'ms'}});if(!r.ok)throw 0;const a=await r.json();if(!a.length){say('Destinasi tidak ditemui. Cuba tambah bandar atau negeri.');return}
+ place={lat:+a[0].lat,lon:+a[0].lon,name:a[0].display_name};clearRoute();if(placeMarker)map.removeLayer(placeMarker);
+ placeMarker=L.marker([place.lat,place.lon]).addTo(map).bindPopup('<b>Destinasi</b><br>'+safe(place.name));map.setView([place.lat,place.lon],16);placeMarker.openPopup();
+ say('Destinasi ditemui dan ditanda pada peta. Tekan “BINA LALUAN” selepas lokasi semasa diperoleh.');
+ }catch(e){say('Carian gagal. Semak internet dan cuba lagi.')}
+};
+$('locate').onclick=()=>{
+ if(!navigator.geolocation){say('Pelayar ini tidak menyokong GPS.');return}say('Mendapatkan lokasi semasa…');
+ navigator.geolocation.getCurrentPosition(p=>{
+ here={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};if(hereMarker)map.removeLayer(hereMarker);
+ hereMarker=L.marker([here.lat,here.lon]).addTo(map).bindPopup('Lokasi semasa anda<br>Ketepatan GPS: '+Math.round(here.accuracy)+' m');
+ map.setView([here.lat,here.lon],16);hereMarker.openPopup();say('Lokasi diperoleh. Anggaran ketepatan GPS: '+Math.round(here.accuracy)+' meter.');
+ },e=>say(e.code===1?'Akses lokasi ditolak. Benarkan Location untuk Safari dalam Settings iPhone.':e.code===3?'Masa mendapatkan lokasi tamat. Cuba lagi.':'Lokasi tidak dapat ditentukan. Cuba di kawasan terbuka.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+};
+$('route').onclick=async()=>{
+ if(!here){say('Tekan “LOKASI SAYA” dahulu supaya titik mula diketahui.');return}if(!place){say('Cari destinasi dahulu sebelum membina laluan.');return}
+ say('Sedang mengira laluan…');clearRoute();
+ try{const u=`https://router.project-osrm.org/route/v1/driving/${here.lon},${here.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=false`;
+ const r=await fetch(u);if(!r.ok)throw 0;const d=await r.json();if(d.code!=='Ok'||!d.routes?.length)throw 0;
+ const v=d.routes[0];routeLine=L.geoJSON(v.geometry,{style:{color:'#ffb52e',weight:6,opacity:.9}}).addTo(map);
+ const b=routeLine.getBounds();if(hereMarker)b.extend(hereMarker.getLatLng());if(placeMarker)b.extend(placeMarker.getLatLng());map.fitBounds(b,{padding:[28,28]});
+ summary.innerHTML='<strong>LALUAN DIJUMPAI</strong><br>Jarak: '+distance(v.distance)+'<br>Anggaran masa memandu: '+duration(v.duration)+'<br><small>Anggaran sahaja; trafik semasa belum diambil kira.</small>';summary.style.display='block';say('Laluan berjaya dipaparkan pada peta.');
+ }catch(e){say('Laluan tidak dapat dikira sekarang. Cuba lagi sebentar lagi atau semak internet.')}
+};
+$('destination').addEventListener('keydown',e=>{if(e.key==='Enter')$('search').click()});
 })();
-</script>
-</body>
-</html>
+</script></body></html>
