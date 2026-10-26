@@ -1,77 +1,62 @@
 <!doctype html>
 <html lang="ms">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#081522">
-<title>NAVI MY v0.3</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#081522"><meta name="description" content="NAVI MY — carian destinasi dan perancangan perjalanan Malaysia.">
+<title>NAVI MY v0.4</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-:root{color-scheme:dark;--bg:#081522;--panel:#142638;--panel2:#20364a;--amber:#ffb52e;--muted:#b8c5d3}
-*{box-sizing:border-box}body{margin:0;padding:20px;padding-top:max(20px,env(safe-area-inset-top));background:var(--bg);color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.app{max-width:560px;margin:0 auto}.eyebrow{color:var(--amber);font-size:11px;letter-spacing:3px;font-weight:800}
-h1{color:var(--amber);font-size:32px;margin:18px 0 12px}h1 small{font-size:17px;color:var(--muted)}
-.intro{color:var(--muted);line-height:1.45;font-size:16px;margin:0 0 24px}label{display:block;margin:14px 0 7px;font-weight:700}
-input,button{width:100%;padding:14px;border-radius:15px;font-size:16px}input{background:var(--panel);border:1px solid #42566b;color:white}
-button{border:0;font-weight:800;cursor:pointer;margin-top:12px}.primary{background:var(--amber);color:#101820}.secondary{background:var(--panel2);color:#fff;border:1px solid #40566b}
-#status{margin:14px 0;padding:13px 14px;background:var(--panel);border:1px solid #2c4053;border-radius:15px;color:#dce5ee;line-height:1.45}
-#summary{display:none;margin:12px 0;padding:14px;background:#132b25;border:1px solid #2d6655;border-radius:15px;line-height:1.5}#summary strong{color:#9af0c5}
-#map{height:48vh;min-height:320px;max-height:620px;border-radius:22px;overflow:hidden;border:1px solid #40566b;margin-top:16px}
-.foot{color:#91a4b5;font-size:12px;line-height:1.5;margin:14px 0 8px}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#142638;color:#fff}.leaflet-popup-content{line-height:1.45}
-</style>
-</head>
+:root{color-scheme:dark;--bg:#081522;--panel:#142638;--panel2:#20364a;--line:#344b60;--amber:#ffb52e;--muted:#b8c5d3;--green:#9af0c5}
+*{box-sizing:border-box}html{background:var(--bg);scroll-behavior:smooth}body{margin:0;padding:calc(14px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at top,#10283b 0%,var(--bg) 55%);color:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+.app{max-width:650px;margin:0 auto}.eyebrow{color:var(--amber);font-size:11px;letter-spacing:3px;font-weight:850;margin:8px 0 18px}h1{color:var(--amber);font-size:clamp(30px,7vw,38px);margin:0 0 10px;letter-spacing:-.8px}h1 small{font-size:17px;color:var(--muted);letter-spacing:0}.intro{color:var(--muted);line-height:1.5;font-size:15px;margin:0 0 22px}
+label,.section-title{display:block;font-size:14px;font-weight:750;margin:16px 0 8px}input,button{font:inherit}input{width:100%;min-height:50px;padding:14px;border-radius:15px;border:1px solid #42566b;background:var(--panel);color:white;font-size:16px;outline:none}input:focus{border-color:var(--amber);box-shadow:0 0 0 3px #ffb52e22}button{border:0;font-weight:800;cursor:pointer;touch-action:manipulation}button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+.btn{width:100%;min-height:49px;padding:13px 14px;border-radius:15px;margin-top:10px;color:#fff;background:var(--panel2);border:1px solid #40566b}.btn.primary{background:var(--amber);color:#101820;border:0}.btn.light{background:#132b3d}.btn:disabled{opacity:.45;cursor:not-allowed}
+.search-wrap{position:relative}.suggestions{display:none;position:relative;margin-top:7px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#102133}.suggestions.show{display:block}.suggestion{display:block;width:100%;text-align:left;padding:12px;background:transparent;color:#f5f7fa;border-bottom:1px solid #263e52;font-weight:550;line-height:1.35}.suggestion:last-child{border-bottom:0}.suggestion small{display:block;color:var(--muted);font-weight:400;margin-top:4px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions .btn{margin-top:0}.panel{margin-top:14px;padding:14px;border:1px solid #2c4053;border-radius:16px;background:#102336;color:#dce5ee;line-height:1.5;font-size:14px}.panel.error{border-color:#82483f;color:#ffd6cf}.panel.success{border-color:#376b5b;background:#102d29}.route-title{font-weight:850;color:var(--green);margin-bottom:6px}.route-stats{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.stat{background:#173b39;border:1px solid #2e6258;padding:7px 10px;border-radius:10px}
+#map{height:min(54vh,510px);min-height:330px;border:1px solid #40566b;border-radius:20px;overflow:hidden;margin-top:16px;background:#d9e3e7;isolation:isolate}.map-actions{display:flex;gap:8px;margin-top:9px}.map-actions .btn{margin-top:0;min-height:43px;padding:10px}
+.fav-list{display:grid;gap:8px}.fav-empty{color:var(--muted);font-size:13px;padding:10px 0}.fav-item{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:13px;background:#102336;padding:8px}.fav-open{flex:1;text-align:left;background:transparent;color:#fff;padding:5px;min-width:0}.fav-open strong{display:block;font-size:14px}.fav-open small{display:block;color:var(--muted);font-weight:450;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}.fav-delete{width:38px;height:38px;border-radius:10px;background:#3a2830;color:#ffd6cf;font-size:19px}.fav-form{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.fav-form input{min-width:0}.fav-form button{border-radius:13px;padding:0 15px;background:var(--amber);color:#101820}.footer{color:#8194a8;font-size:12px;line-height:1.5;margin:16px 2px 4px}.leaflet-container{font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#142638;color:#fff}.leaflet-popup-content{line-height:1.4}.leaflet-control-zoom a{color:#142638!important}
+@media(min-width:560px){body{padding-left:22px;padding-right:22px}.intro{font-size:16px}}@media(max-width:370px){.actions{grid-template-columns:1fr}.fav-form{grid-template-columns:1fr}.fav-form button{min-height:45px}}
+</style></head>
 <body><main class="app">
-<div class="eyebrow">MALAYSIA · NAVIGATION CONCEPT</div>
-<h1>NAVI MY <small>v0.3</small></h1>
-<p class="intro">Peta sebenar, carian tempat, lokasi semasa dan laluan perjalanan — langkah seterusnya ke arah navigasi Malaysia.</p>
-<label for="destination">Cari destinasi</label>
-<input id="destination" placeholder="Contoh: Kluang Mall, Johor" autocomplete="street-address">
-<button class="primary" id="search">CARI DESTINASI</button>
-<button class="secondary" id="locate">◎ LOKASI SAYA</button>
-<button class="secondary" id="route">↗ BINA LALUAN</button>
-<div id="status" role="status" aria-live="polite">Peta sedia. Cari destinasi atau tekan “LOKASI SAYA”. Dapatkan lokasi semasa dan cari destinasi sebelum membina laluan.</div>
-<div id="summary"></div><div id="map"></div>
-<p class="foot">Prototaip pembelajaran. Memerlukan internet dan kebenaran GPS. Jarak dan masa ialah anggaran; trafik semasa belum diambil kira. Peta © OpenStreetMap contributors.</p>
+<div class="eyebrow">MALAYSIA · NAVIGATION CONCEPT</div><h1>NAVI MY <small>v0.4</small></h1>
+<p class="intro">Cari destinasi, semak laluan dan simpan tempat kegemaran — direka untuk kegunaan mudah pada iPhone.</p>
+<label for="destination">Cari destinasi</label><div class="search-wrap"><input id="destination" type="search" placeholder="Contoh: Kluang Mall, Johor" autocomplete="off" enterkeyhint="search" aria-label="Cari destinasi"><div id="suggestions" class="suggestions" role="listbox"></div></div>
+<button class="btn primary" id="searchBtn">CARI DESTINASI</button>
+<div class="actions" style="margin-top:10px"><button class="btn" id="locateBtn">◎ LOKASI SAYA</button><button class="btn" id="routeBtn" disabled>↗ BINA LALUAN</button></div>
+<div class="actions" style="margin-top:8px"><button class="btn light" id="appleBtn" disabled>BUKA APPLE MAPS</button><button class="btn light" id="googleBtn" disabled>BUKA GOOGLE MAPS</button></div>
+<div id="status" class="panel" role="status" aria-live="polite">Sedia. Cari destinasi atau tekan “LOKASI SAYA” untuk mendapatkan lokasi semasa.</div><div id="routeSummary" class="panel success" hidden></div>
+<div id="map" aria-label="Peta navigasi"></div><div class="map-actions"><button class="btn" id="recenterBtn">◎ PUSATKAN PETA</button><button class="btn" id="clearRouteBtn">PADAM LALUAN</button></div>
+<div class="section-title">★ Lokasi kegemaran</div><div id="favorites" class="fav-list"></div><div class="fav-form"><input id="favoriteName" type="text" maxlength="40" placeholder="Nama lokasi, contoh: Rumah" aria-label="Nama lokasi kegemaran"><button id="saveFavoriteBtn">SIMPAN LOKASI</button></div>
+<div class="footer">NAVI MY v0.4 ialah prototaip. Carian menggunakan OpenStreetMap/Nominatim dan laluan menggunakan perkhidmatan OSRM awam. Sambungan internet diperlukan; anggaran masa tidak mengambil kira trafik langsung. Lokasi kegemaran disimpan dalam pelayar peranti ini sahaja.</div>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-(()=> {
-const $=id=>document.getElementById(id), status=$('status'), summary=$('summary');
-const map=L.map('map').setView([2.0226,103.3178],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-let here=null,place=null,hereMarker=null,placeMarker=null,routeLine=null;
-const say=t=>status.textContent=t;
-const clearRoute=()=>{if(routeLine){map.removeLayer(routeLine);routeLine=null}summary.style.display='none';summary.textContent=''};
-const safe=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const distance=m=>m>=1000?(m/1000).toFixed(1)+' km':Math.round(m)+' m';
-const duration=s=>{let m=Math.round(s/60);return m<60?m+' min':Math.floor(m/60)+' jam'+(m%60?' '+m%60+' min':'')};
-$('search').onclick=async()=>{
- const q=$('destination').value.trim();if(!q){say('Masukkan nama destinasi dahulu.');return}
- say('Sedang mencari destinasi…');
- try{const r=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(q),{headers:{'Accept-Language':'ms'}});if(!r.ok)throw 0;const a=await r.json();if(!a.length){say('Destinasi tidak ditemui. Cuba tambah bandar atau negeri.');return}
- place={lat:+a[0].lat,lon:+a[0].lon,name:a[0].display_name};clearRoute();if(placeMarker)map.removeLayer(placeMarker);
- placeMarker=L.marker([place.lat,place.lon]).addTo(map).bindPopup('<b>Destinasi</b><br>'+safe(place.name));map.setView([place.lat,place.lon],16);placeMarker.openPopup();
- say('Destinasi ditemui dan ditanda pada peta. Tekan “BINA LALUAN” selepas lokasi semasa diperoleh.');
- }catch(e){say('Carian gagal. Semak internet dan cuba lagi.')}
-};
-$('locate').onclick=()=>{
- if(!navigator.geolocation){say('Pelayar ini tidak menyokong GPS.');return}say('Mendapatkan lokasi semasa…');
- navigator.geolocation.getCurrentPosition(p=>{
- here={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};if(hereMarker)map.removeLayer(hereMarker);
- hereMarker=L.marker([here.lat,here.lon]).addTo(map).bindPopup('Lokasi semasa anda<br>Ketepatan GPS: '+Math.round(here.accuracy)+' m');
- map.setView([here.lat,here.lon],16);hereMarker.openPopup();say('Lokasi diperoleh. Anggaran ketepatan GPS: '+Math.round(here.accuracy)+' meter.');
- },e=>say(e.code===1?'Akses lokasi ditolak. Benarkan Location untuk Safari dalam Settings iPhone.':e.code===3?'Masa mendapatkan lokasi tamat. Cuba lagi.':'Lokasi tidak dapat ditentukan. Cuba di kawasan terbuka.'),{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
-};
-$('route').onclick=async()=>{
- if(!here){say('Tekan “LOKASI SAYA” dahulu supaya titik mula diketahui.');return}if(!place){say('Cari destinasi dahulu sebelum membina laluan.');return}
- say('Sedang mengira laluan…');clearRoute();
- try{const u=`https://router.project-osrm.org/route/v1/driving/${here.lon},${here.lat};${place.lon},${place.lat}?overview=full&geometries=geojson&steps=false`;
- const r=await fetch(u);if(!r.ok)throw 0;const d=await r.json();if(d.code!=='Ok'||!d.routes?.length)throw 0;
- const v=d.routes[0];routeLine=L.geoJSON(v.geometry,{style:{color:'#ffb52e',weight:6,opacity:.9}}).addTo(map);
- const b=routeLine.getBounds();if(hereMarker)b.extend(hereMarker.getLatLng());if(placeMarker)b.extend(placeMarker.getLatLng());map.fitBounds(b,{padding:[28,28]});
- summary.innerHTML='<strong>LALUAN DIJUMPAI</strong><br>Jarak: '+distance(v.distance)+'<br>Anggaran masa memandu: '+duration(v.duration)+'<br><small>Anggaran sahaja; trafik semasa belum diambil kira.</small>';summary.style.display='block';say('Laluan berjaya dipaparkan pada peta.');
- }catch(e){say('Laluan tidak dapat dikira sekarang. Cuba lagi sebentar lagi atau semak internet.')}
-};
-$('destination').addEventListener('keydown',e=>{if(e.key==='Enter')$('search').click()});
+(()=>{"use strict";
+const $=id=>document.getElementById(id),statusEl=$("status"),summaryEl=$("routeSummary");
+let currentPosition=null,destination=null,destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null;
+const STORAGE_KEY="navimy_favorites_v04";
+const map=L.map("map",{zoomControl:true,scrollWheelZoom:false}).setView([4.2105,101.9758],6);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+setTimeout(()=>map.invalidateSize(),250);
+function setStatus(msg,kind=""){statusEl.className="panel"+(kind?" "+kind:"");statusEl.textContent=msg}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function closeSuggestions(){$("suggestions").classList.remove("show");$("suggestions").replaceChildren()}
+function normalize(item){return{lat:Number(item.lat),lon:Number(item.lon),name:item.name||(item.display_name||"Destinasi").split(",")[0],display_name:item.display_name||item.name||"Destinasi"}}
+async function geocode(q,limit=5){const u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit="+limit+"&countrycodes=my&q="+encodeURIComponent(q);const r=await fetch(u,{headers:{"Accept":"application/json"}});if(!r.ok)throw Error("Carian gagal ("+r.status+"). Cuba sebentar lagi.");return(await r.json()).map(normalize)}
+function showSuggestions(items){const box=$("suggestions");box.replaceChildren();if(!items.length){const d=document.createElement("div");d.className="suggestion";d.textContent="Tiada hasil ditemui. Cuba nama tempat atau alamat yang lebih lengkap.";box.appendChild(d)}else items.forEach(item=>{const b=document.createElement("button");b.type="button";b.className="suggestion";b.innerHTML=esc(item.name)+"<small>"+esc(item.display_name.length>140?item.display_name.slice(0,139)+"…":item.display_name)+"</small>";b.addEventListener("click",()=>chooseDestination(item));box.appendChild(b)});box.classList.add("show")}
+async function searchDestination(){const q=$("destination").value.trim();if(q.length<2){setStatus("Masukkan sekurang-kurangnya 2 aksara untuk mencari destinasi.","error");return}closeSuggestions();$("searchBtn").disabled=true;setStatus("Sedang mencari destinasi…");try{const results=await geocode(q,6);if(!results.length){showSuggestions([]);setStatus("Tiada destinasi ditemui. Semak ejaan atau tambah nama bandar.","error")}else if(results.length===1)chooseDestination(results[0]);else{showSuggestions(results);setStatus("Pilih lokasi yang tepat daripada senarai cadangan.")}}catch(e){setStatus(e.message||"Tidak dapat membuat carian. Semak internet.","error")}finally{$("searchBtn").disabled=false}}
+function chooseDestination(item){destination=normalize(item);$("destination").value=destination.name;closeSuggestions();if(destinationMarker)map.removeLayer(destinationMarker);destinationMarker=L.marker([destination.lat,destination.lon]).addTo(map).bindPopup("<strong>Destinasi</strong><br>"+esc(destination.display_name));map.setView([destination.lat,destination.lon],15);destinationMarker.openPopup();$("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;summaryEl.hidden=true;setStatus("Destinasi dipilih: "+destination.display_name+(currentPosition?" Tekan “BINA LALUAN” untuk mengira perjalanan.":" Dapatkan lokasi semasa untuk membina laluan."))}
+function locateMe(){if(!navigator.geolocation){setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");return}$("locateBtn").disabled=true;setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");navigator.geolocation.getCurrentPosition(p=>{currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};if(userMarker)map.removeLayer(userMarker);userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();$("routeBtn").disabled=!destination;setStatus("Lokasi diperoleh. Anggaran ketepatan GPS: "+Math.round(currentPosition.accuracy)+" meter.","success");$("locateBtn").disabled=false},e=>{setStatus(e.code===1?"Kebenaran lokasi ditolak. Semak Settings > Privacy & Security > Location Services > Safari Websites pada iPhone.":e.code===2?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS.":"Permintaan lokasi tamat masa. Cuba lagi.","error");$("locateBtn").disabled=false},{enableHighAccuracy:true,timeout:15000,maximumAge:10000})}
+async function buildRoute(){if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return}if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return}$("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");try{const c=`${currentPosition.lon},${currentPosition.lat};${destination.lon},${destination.lat}`,r=await fetch("https://router.project-osrm.org/route/v1/driving/"+c+"?overview=full&geometries=geojson&steps=false");if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");const route=d.routes[0];if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div>';summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success")}catch(e){setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error")}finally{$("routeBtn").disabled=!currentPosition||!destination}}
+function openExternal(provider){if(!destination){setStatus("Cari destinasi dahulu.","error");return}const dest=destination.lat+","+destination.lon;let url;if(provider==="apple")url=currentPosition?"https://maps.apple.com/?saddr="+encodeURIComponent(currentPosition.lat+","+currentPosition.lon)+"&daddr="+encodeURIComponent(dest)+"&dirflg=d":"https://maps.apple.com/?daddr="+encodeURIComponent(dest)+"&dirflg=d";else url=currentPosition?"https://www.google.com/maps/dir/?api=1&origin="+encodeURIComponent(currentPosition.lat+","+currentPosition.lon)+"&destination="+encodeURIComponent(dest)+"&travelmode=driving":"https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(dest)+"&travelmode=driving";window.open(url,"_blank","noopener,noreferrer")}
+function readFavorites(){try{const x=JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]");return Array.isArray(x)?x:[]}catch(_){return[]}}
+function writeFavorites(items){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(items));return true}catch(_){setStatus("Pelayar tidak membenarkan simpanan setempat. Semak tetapan Safari.","error");return false}}
+function renderFavorites(){const list=$("favorites");list.replaceChildren();const items=readFavorites();if(!items.length){const d=document.createElement("div");d.className="fav-empty";d.textContent="Belum ada lokasi disimpan. Cari destinasi dahulu, kemudian tekan “SIMPAN LOKASI”.";list.appendChild(d);return}items.forEach((item,i)=>{const row=document.createElement("div");row.className="fav-item";const b=document.createElement("button");b.className="fav-open";b.type="button";const strong=document.createElement("strong");strong.textContent=item.label;const small=document.createElement("small");small.textContent=item.name;b.append(strong,small);b.addEventListener("click",()=>chooseDestination(item));const del=document.createElement("button");del.className="fav-delete";del.type="button";del.textContent="×";del.setAttribute("aria-label","Padam "+item.label);del.addEventListener("click",()=>{const now=readFavorites();now.splice(i,1);if(writeFavorites(now)){renderFavorites();setStatus("Lokasi kegemaran dipadam.")}});row.append(b,del);list.appendChild(row)})}
+function saveFavorite(){if(!destination){setStatus("Cari dan pilih destinasi sebelum menyimpannya.","error");return}const label=$("favoriteName").value.trim()||destination.name,items=readFavorites().filter(x=>x.label.toLowerCase()!==label.toLowerCase());items.unshift({label,name:destination.name,display_name:destination.display_name,lat:destination.lat,lon:destination.lon});if(writeFavorites(items.slice(0,20))){$("favoriteName").value="";renderFavorites();setStatus("“"+label+"” disimpan dalam lokasi kegemaran pada peranti ini.","success")}}
+function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.")}
+$("searchBtn").addEventListener("click",searchDestination);$("destination").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchDestination()}});
+$("destination").addEventListener("input",()=>{clearTimeout(searchTimer);const q=$("destination").value.trim();if(q.length<3){closeSuggestions();return}searchTimer=setTimeout(async()=>{try{const res=await geocode(q,5);if($("destination").value.trim()===q&&res.length)showSuggestions(res)}catch(_){ }},700)});
+document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))closeSuggestions()});$("locateBtn").addEventListener("click",locateMe);$("routeBtn").addEventListener("click",buildRoute);$("appleBtn").addEventListener("click",()=>openExternal("apple"));$("googleBtn").addEventListener("click",()=>openExternal("google"));
+$("recenterBtn").addEventListener("click",()=>{if(currentPosition)map.setView([currentPosition.lat,currentPosition.lon],15);else if(destination)map.setView([destination.lat,destination.lon],15);else map.setView([4.2105,101.9758],6)});$("clearRouteBtn").addEventListener("click",clearRoute);$("saveFavoriteBtn").addEventListener("click",saveFavorite);$("favoriteName").addEventListener("keydown",e=>{if(e.key==="Enter")saveFavorite()});renderFavorites();
 })();
 </script></body></html>
