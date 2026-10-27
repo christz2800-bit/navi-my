@@ -13,7 +13,7 @@ export default async (request) => {
     );
   }
 
-  // Small query and bounded requests to keep the function within its deadline.
+  // Modest query; race public Overpass mirrors instead of waiting one by one.
   const query =
     `[out:json][timeout:6];(` +
     `nwr(around:1000,${lat},${lon})[name][tourism];` +
@@ -29,54 +29,63 @@ export default async (request) => {
   ];
 
   const failures = [];
+  const controllers = [];
+  const timers = [];
 
-  for (const endpoint of endpoints) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6500);
+  try {
+    const attempts = endpoints.map(async (endpoint) => {
+      const controller = new AbortController();
+      controllers.push(controller);
+      const timer = setTimeout(() => controller.abort(), 7000);
+      timers.push(timer);
 
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-          "Accept": "application/json",
-          "User-Agent": "NAVI-MY/0.7.7 nearby places"
-        },
-        body: "data=" + encodeURIComponent(query),
-        signal: controller.signal
-      });
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Accept": "application/json",
+            "User-Agent": "NAVI-MY/0.7.8 nearby places"
+          },
+          body: "data=" + encodeURIComponent(query),
+          signal: controller.signal
+        });
 
-      if (!response.ok) {
-        failures.push(`${new URL(endpoint).hostname}: HTTP ${response.status}`);
-        continue;
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data || !Array.isArray(data.elements)) {
+          throw new Error("respons JSON tidak sah");
+        }
+        return data;
+      } catch (error) {
+        const host = new URL(endpoint).hostname;
+        const reason = error?.name === "AbortError"
+          ? "timeout selepas 7 saat"
+          : (error?.message || "ralat sambungan");
+        failures.push(`${host}: ${reason}`);
+        throw error;
+      } finally {
+        clearTimeout(timer);
       }
+    });
 
-      const data = await response.json();
-      if (!data || !Array.isArray(data.elements)) {
-        failures.push(`${new URL(endpoint).hostname}: respons JSON tidak sah`);
-        continue;
-      }
-
-      return Response.json(data, {
-        headers: { "Cache-Control": "public, max-age=30" }
-      });
-    } catch (error) {
-      const host = new URL(endpoint).hostname;
-      failures.push(
-        error?.name === "AbortError"
-          ? `${host}: timeout selepas 6.5 saat`
-          : `${host}: ${error?.message || "ralat sambungan"}`
-      );
-    } finally {
-      clearTimeout(timer);
-    }
+    const data = await Promise.any(attempts);
+    return Response.json(data, {
+      headers: { "Cache-Control": "public, max-age=30" }
+    });
+  } catch {
+    return Response.json(
+      {
+        error: "Semua pelayan Overpass gagal memberi respons.",
+        details: failures
+      },
+      { status: 502 }
+    );
+  } finally {
+    for (const controller of controllers) controller.abort();
+    for (const timer of timers) clearTimeout(timer);
   }
-
-  return Response.json(
-    {
-      error: "Semua pelayan Overpass gagal memberi respons.",
-      details: failures
-    },
-    { status: 502 }
-  );
 };
