@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#081522">
 <meta name="description" content="NAVI MY — carian destinasi dan perancangan perjalanan Malaysia.">
-<title>NAVI MY v0.6</title>
+<title>NAVI MY v0.7</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{color-scheme:dark;--bg:#081522;--panel:#142638;--panel2:#20364a;--line:#344b60;--amber:#ffb52e;--muted:#b8c5d3;--green:#9af0c5}
@@ -66,7 +66,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 <body>
 <main class="app">
 <div class="eyebrow">MALAYSIA · NAVIGATION CONCEPT</div>
-<h1>NAVI MY <small>v0.6</small></h1>
+<h1>NAVI MY <small>v0.7</small></h1>
 <p class="intro">Cari destinasi, semak laluan dan simpan tempat kegemaran — direka untuk kegunaan mudah pada iPhone.</p>
 <label for="destination">Cari destinasi</label>
 <div class="search-wrap">
@@ -74,6 +74,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <div id="suggestions" class="suggestions" role="listbox"></div>
 </div>
 <button class="btn primary" id="searchBtn">CARI DESTINASI</button>
+<button class="btn" id="nearbyBtn" disabled>⌖ CARI TEMPAT BERHAMPIRAN</button>
 <div class="actions" style="margin-top:10px">
   <button class="btn" id="locateBtn">◎ LOKASI SAYA</button>
   <button class="btn" id="routeBtn" disabled>↗ BINA LALUAN</button>
@@ -95,7 +96,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <input id="favoriteName" type="text" maxlength="40" placeholder="Nama lokasi, contoh: Rumah" aria-label="Nama lokasi kegemaran">
   <button id="saveFavoriteBtn">SIMPAN LOKASI</button>
 </div>
-<div class="footer">NAVI MY v0.6 ialah prototaip. Carian menggunakan OpenStreetMap/Nominatim dan laluan menggunakan perkhidmatan OSRM awam. Sambungan internet diperlukan; anggaran masa tidak mengambil kira trafik langsung. Selepas pin dialihkan, NAVI MY cuba mendapatkan nama/alamat baharu; koordinat pin digunakan untuk laluan dan navigasi luar. Lokasi kegemaran disimpan dalam pelayar peranti ini sahaja.</div>
+<div class="footer">NAVI MY v0.7 ialah prototaip. Carian pintar menggunakan OpenStreetMap/Nominatim; tempat berhampiran menggunakan OpenStreetMap/Overpass; laluan menggunakan OSRM awam. Sambungan internet diperlukan; anggaran masa tidak mengambil kira trafik langsung. Selepas pin dialihkan, NAVI MY cuba mendapatkan nama/alamat baharu; koordinat pin digunakan untuk laluan dan navigasi luar. Lokasi kegemaran disimpan dalam pelayar peranti ini sahaja.</div>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -104,6 +105,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 const $=id=>document.getElementById(id);
 const statusEl=$("status"),summaryEl=$("routeSummary");
 let currentPosition=null,destination=null;
+let nearbySearchCenter=null;
 let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0;
 const STORAGE_KEY="navimy_favorites_v04";
 const map=L.map("map",{zoomControl:true,scrollWheelZoom:false}).setView([4.2105,101.9758],6);
@@ -124,6 +126,56 @@ async function geocode(q,limit=5){
   if(!r.ok)throw Error("Carian gagal ("+r.status+"). Cuba sebentar lagi.");
   return (await r.json()).map(normalize);
 }
+function searchVariants(q){
+  const base=q.trim();
+  const variants=[base];
+  const lower=base.toLowerCase();
+  if(lower.includes("hutan rekreasi")) variants.push(base.replace(/hutan rekreasi/i,"Gunung Lambak Recreational Forest"));
+  if(lower.includes("hutan lipur")) variants.push(base.replace(/hutan lipur/i,"Gunung Lambak Recreational Forest"));
+  if(lower.includes("gunung lambak")){
+    variants.push("Gunung Lambak, Kluang, Johor, Malaysia");
+    variants.push("Gunung Lambak Recreational Forest, Kluang, Johor, Malaysia");
+    variants.push("Hutan Lipur Gunung Lambak, Kluang, Johor, Malaysia");
+  }
+  if(!/johor|malaysia/i.test(base)) variants.push(base+", Johor, Malaysia");
+  return [...new Set(variants)];
+}
+async function smartGeocode(q,limit=6){
+  const merged=[],seen=new Set();
+  for(const variant of searchVariants(q)){
+    const items=await geocode(variant,limit);
+    for(const item of items){
+      const key=item.lat.toFixed(5)+","+item.lon.toFixed(5);
+      if(!seen.has(key)){seen.add(key);merged.push(item);}
+    }
+    if(merged.length>0)break;
+  }
+  return merged.slice(0,limit);
+}
+async function nearbyPlaces(){
+  const center=destination?{lat:destination.lat,lon:destination.lon}:currentPosition?{lat:currentPosition.lat,lon:currentPosition.lon}:nearbySearchCenter;
+  if(!center){setStatus("Pilih destinasi atau tekan LOKASI SAYA dahulu supaya NAVI MY tahu kawasan carian.","error");return;}
+  const btn=$("nearbyBtn");btn.disabled=true;setStatus("Mencari tempat bernama berhampiran pin…");
+  const query='[out:json][timeout:20];(nwr(around:1800,'+center.lat+','+center.lon+') [name] [tourism];nwr(around:1800,'+center.lat+','+center.lon+') [name] [leisure];nwr(around:1800,'+center.lat+','+center.lon+') [name] [amenity~"parking|restaurant|cafe|fuel|toilets|information"];nwr(around:1800,'+center.lat+','+center.lon+') [name] [shop];);out center 35;';
+  try{
+    const r=await fetch("https://overpass-api.de/api/interpreter?data="+encodeURIComponent(query),{headers:{"Accept":"application/json"}});
+    if(!r.ok)throw Error("Perkhidmatan tempat berhampiran tidak tersedia.");
+    const data=await r.json();
+    const items=[];const seen=new Set();
+    for(const el of (data.elements||[])){
+      const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=el.tags?.name;
+      if(!name||!Number.isFinite(lat)||!Number.isFinite(lon))continue;
+      const key=lat.toFixed(5)+","+lon.toFixed(5);if(seen.has(key))continue;seen.add(key);
+      const kind=el.tags?.tourism||el.tags?.leisure||el.tags?.amenity||el.tags?.shop||"tempat";
+      items.push({lat,lon,name,display_name:name+" · "+kind+" (berhampiran pin)"});
+    }
+    items.sort((a,b)=>distanceMeters(center,a)-distanceMeters(center,b));
+    if(!items.length){showSuggestions([]);setStatus("Tiada tempat bernama ditemui dalam lingkungan 1.8 km. Cuba alihkan pin atau cari nama tempat dengan bandar.","error");}
+    else{showSuggestions(items.slice(0,20));setStatus("Pilih tempat berhampiran yang betul. Jarak carian sehingga 1.8 km dari pin.","success");}
+  }catch(e){setStatus((e.message||"Carian tempat berhampiran gagal.")+" Cuba lagi sebentar atau gunakan carian nama.","error");}
+  finally{btn.disabled=!(destination||currentPosition||nearbySearchCenter);}
+}
+function distanceMeters(a,b){const rad=x=>x*Math.PI/180;const dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);const x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 6371000*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
 async function reverseGeocode(lat,lon){
   const u="https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat="+encodeURIComponent(lat)+"&lon="+encodeURIComponent(lon);
   const r=await fetch(u,{headers:{"Accept":"application/json"}});
@@ -186,8 +238,8 @@ async function searchDestination(){
   if(q.length<2){setStatus("Masukkan sekurang-kurangnya 2 aksara untuk mencari destinasi.","error");return;}
   closeSuggestions();$("searchBtn").disabled=true;setStatus("Sedang mencari destinasi…");
   try{
-    const results=await geocode(q,6);
-    if(!results.length){showSuggestions([]);setStatus("Tiada destinasi ditemui. Semak ejaan atau tambah nama bandar.","error");}
+    const results=await smartGeocode(q,6);
+    if(!results.length){showSuggestions([]);$("nearbyBtn").disabled=false;setStatus("Tiada hasil carian nama. Tekan peta berhampiran kawasan sasaran untuk menetapkan pusat carian, kemudian pilih CARI TEMPAT BERHAMPIRAN.","error");}
     else if(results.length===1)chooseDestination(results[0]);
     else{showSuggestions(results);setStatus("Pilih lokasi yang tepat daripada senarai cadangan.");}
   }catch(e){setStatus(e.message||"Tidak dapat membuat carian. Semak internet.","error");}
@@ -195,9 +247,9 @@ async function searchDestination(){
 }
 function chooseDestination(item){
   reverseRequest++;
-  destination=normalize(item);$("destination").value=destination.name;closeSuggestions();
+  destination=normalize(item);nearbySearchCenter={lat:destination.lat,lon:destination.lon};$("destination").value=destination.name;closeSuggestions();
   showDestinationMarker();map.setView([destination.lat,destination.lon],15);destinationMarker.openPopup();
-  $("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;summaryEl.hidden=true;
+  $("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;$("nearbyBtn").disabled=false;summaryEl.hidden=true;
   setStatus("Destinasi dipilih: "+destination.display_name+". Semak kedudukan pin. Jika pin tidak tepat, seret ke pintu masuk yang dikehendaki; koordinat pin akan digunakan untuk laluan.");
 }
 function locateMe(){
@@ -205,6 +257,8 @@ function locateMe(){
   $("locateBtn").disabled=true;setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
   navigator.geolocation.getCurrentPosition(p=>{
     currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};
+    nearbySearchCenter={lat:currentPosition.lat,lon:currentPosition.lon};
+    $("nearbyBtn").disabled=false;
     if(userMarker)map.removeLayer(userMarker);
     userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");
     map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();
@@ -260,12 +314,16 @@ function saveFavorite(){
 }
 function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");}
 $("searchBtn").addEventListener("click",searchDestination);
+$("nearbyBtn").addEventListener("click",nearbyPlaces);
 $("destination").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchDestination();}});
 $("destination").addEventListener("input",()=>{
   clearTimeout(searchTimer);const q=$("destination").value.trim();if(q.length<3){closeSuggestions();return;}
-  searchTimer=setTimeout(async()=>{try{const res=await geocode(q,5);if($("destination").value.trim()===q&&res.length)showSuggestions(res);}catch(_){}},700);
+  searchTimer=setTimeout(async()=>{try{const res=await smartGeocode(q,5);if($("destination").value.trim()===q&&res.length)showSuggestions(res);}catch(_){}},700);
 });
 document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))closeSuggestions();});
+map.on("click",e=>{
+  if(!destination){nearbySearchCenter={lat:e.latlng.lat,lon:e.latlng.lng};$("nearbyBtn").disabled=false;setStatus("Pusat carian tempat berhampiran ditetapkan pada peta. Tekan CARI TEMPAT BERHAMPIRAN untuk melihat tempat bernama sekitar titik ini.");}
+});
 $("locateBtn").addEventListener("click",locateMe);$("routeBtn").addEventListener("click",buildRoute);
 $("appleBtn").addEventListener("click",()=>openExternal("apple"));$("googleBtn").addEventListener("click",()=>openExternal("google"));
 $("recenterBtn").addEventListener("click",()=>{if(currentPosition)map.setView([currentPosition.lat,currentPosition.lon],15);else if(destination)map.setView([destination.lat,destination.lon],15);else map.setView([4.2105,101.9758],6);});
