@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#081522">
 <meta name="description" content="NAVI MY — carian destinasi dan perancangan perjalanan Malaysia.">
-<title>NAVI MY v0.7.3</title>
+<title>NAVI MY v0.7.4</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root{color-scheme:dark;--bg:#081522;--panel:#142638;--panel2:#20364a;--line:#344b60;--amber:#ffb52e;--muted:#b8c5d3;--green:#9af0c5}
@@ -66,7 +66,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 <body>
 <main class="app">
 <div class="eyebrow">MALAYSIA · NAVIGATION CONCEPT</div>
-<h1>NAVI MY <small>v0.7.3</small></h1>
+<h1>NAVI MY <small>v0.7.4</small></h1>
 <p class="intro">Cari destinasi, semak laluan dan simpan tempat kegemaran — direka untuk kegunaan mudah pada iPhone.</p>
 <label for="destination">Cari destinasi</label>
 <div class="search-wrap">
@@ -96,7 +96,7 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
   <input id="favoriteName" type="text" maxlength="40" placeholder="Nama lokasi, contoh: Rumah" aria-label="Nama lokasi kegemaran">
   <button id="saveFavoriteBtn">SIMPAN LOKASI</button>
 </div>
-<div class="footer">NAVI MY v0.7.3 ialah prototaip. Carian pintar menggunakan OpenStreetMap/Nominatim; tempat berhampiran menggunakan OpenStreetMap/Overpass; laluan menggunakan OSRM awam. Sambungan internet diperlukan; anggaran masa tidak mengambil kira trafik langsung. Selepas pin dialihkan, NAVI MY cuba mendapatkan nama/alamat baharu; koordinat pin digunakan untuk laluan dan navigasi luar. Lokasi kegemaran disimpan dalam pelayar peranti ini sahaja.</div>
+<div class="footer">NAVI MY v0.7.4 ialah prototaip. Carian pintar menggunakan OpenStreetMap/Nominatim; tempat berhampiran menggunakan OpenStreetMap/Overpass; laluan menggunakan OSRM awam. Sambungan internet diperlukan; anggaran masa tidak mengambil kira trafik langsung. Selepas pin dialihkan, NAVI MY cuba mendapatkan nama/alamat baharu; koordinat pin digunakan untuk laluan dan navigasi luar. Lokasi kegemaran disimpan dalam pelayar peranti ini sahaja.</div>
 </main>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -147,34 +147,39 @@ async function nearbyPlaces(){
  const center=destination?{lat:destination.lat,lon:destination.lon}:currentPosition?{lat:currentPosition.lat,lon:currentPosition.lon}:nearbySearchCenter;
  if(!center){setStatus("Pilih destinasi atau tekan LOKASI SAYA dahulu supaya NAVI MY tahu kawasan carian.","error");return;}
  const btn=$("nearbyBtn");btn.disabled=true;setStatus("Mencari tempat bernama berhampiran pin…");
- const query='[out:json][timeout:20];(nwr(around:1800,'+center.lat+','+center.lon+')[name][tourism];nwr(around:1800,'+center.lat+','+center.lon+')[name][leisure];nwr(around:1800,'+center.lat+','+center.lon+')[name][amenity~"parking|restaurant|cafe|fuel|toilets|information"];nwr(around:1800,'+center.lat+','+center.lon+')[name][shop];);out center 35;';
+ const query='[out:json][timeout:15];(nwr(around:1200,'+center.lat+','+center.lon+')[name][tourism];nwr(around:1200,'+center.lat+','+center.lon+')[name][leisure];nwr(around:1200,'+center.lat+','+center.lon+')[name][amenity];nwr(around:1200,'+center.lat+','+center.lon+')[name][shop];);out center 25;';
  const endpoints=[
-  "https://overpass.kumi.systems/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
   "https://overpass-api.de/api/interpreter"
  ];
- let data=null,lastError=null;
+ let data=null,lastError=null,failedEndpoint="";
  try{
   for(const endpoint of endpoints){
-   // Try GET first (avoids POST-specific browser/proxy issues), then POST on failure.
    for(const method of ["GET","POST"]){
     let timeout=null;
     try{
-     const controller=new AbortController();timeout=setTimeout(()=>controller.abort(),20000);
+     const controller=new AbortController();timeout=setTimeout(()=>controller.abort(),16000);
      const options=method==="GET"
       ? {method:"GET",headers:{"Accept":"application/json"},signal:controller.signal}
       : {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded;charset=UTF-8","Accept":"application/json"},body:"data="+encodeURIComponent(query),signal:controller.signal};
      const url=method==="GET"?endpoint+"?data="+encodeURIComponent(query):endpoint;
      const response=await fetch(url,options);
-     if(!response.ok)throw Error("Pelayan "+method+" membalas "+response.status);
+     if(!response.ok)throw Error("HTTP "+response.status);
      const result=await response.json();
-     if(!result||!Array.isArray(result.elements))throw Error("Format data carian tidak sah");
+     if(!result||!Array.isArray(result.elements))throw Error("Respons bukan JSON Overpass");
      data=result;break;
-    }catch(err){lastError=err;}finally{if(timeout)clearTimeout(timeout);}
+    }catch(err){lastError=err;failedEndpoint=endpoint;}finally{if(timeout)clearTimeout(timeout);}
    }
    if(data)break;
   }
-  if(!data)throw lastError||Error("Semua pelayan carian tidak tersedia");
+  if(!data){
+   let detail=lastError&&lastError.message?lastError.message:"ralat rangkaian/CORS";
+   if(lastError&&lastError.name==="AbortError")detail="masa tamat";
+   setStatus("Carian tempat berhampiran gagal ("+detail+"). GPS dan carian destinasi masih berfungsi. Cuba semula kemudian.","error");
+   return;
+  }
   const items=[],seen=new Set();
   for(const el of data.elements){
    const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=el.tags?.name;
@@ -185,11 +190,11 @@ async function nearbyPlaces(){
    items.push({lat:point.lat,lon:point.lon,name,display_name:name+" · "+kind+" (berhampiran pin)"});
   }
   items.sort((a,b)=>distanceMeters(center,a)-distanceMeters(center,b));
-  if(!items.length){showSuggestions([]);setStatus("Tiada tempat bernama ditemui dalam lingkungan 1.8 km. Cuba alihkan pin atau cari nama tempat dengan bandar.","error");}
-  else{showSuggestions(items.slice(0,20));setStatus("Pilih tempat berhampiran yang betul. Jarak carian sehingga 1.8 km dari pin.","success");}
+  if(!items.length){showSuggestions([]);setStatus("Tiada tempat bernama ditemui dalam lingkungan 1.2 km. Cuba destinasi lain atau alihkan pin.","error");}
+  else{showSuggestions(items.slice(0,20));setStatus("Ditemui "+items.length+" tempat berhampiran. Pilih tempat yang betul.","success");}
  }catch(e){
-  const timed=e&&e.name==="AbortError";
-  setStatus((timed?"Carian tempat berhampiran mengambil masa terlalu lama.":"Pelayan carian tempat berhampiran tidak dapat dicapai selepas mencuba beberapa kaedah.")+" Cuba lagi sebentar atau gunakan carian nama.","error");
+  const detail=e&&e.message?e.message:"ralat tidak diketahui";
+  setStatus("Carian tempat berhampiran gagal: "+detail+".","error");
  }finally{btn.disabled=!(destination||currentPosition||nearbySearchCenter);}
 }
 async function reverseGeocode(lat,lon){
