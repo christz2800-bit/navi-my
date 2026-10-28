@@ -285,7 +285,7 @@ steps.forEach((step,i)=>{
     ?(metres/1000).toFixed(1)+" km"
     :metres+" m";
 
-  li.textContent=(i+1)+". "+instruction+" — "+distance;
+  li.textContent=instruction+" — "+distance;
   stepsList.appendChild(li);
 });
   summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success");
