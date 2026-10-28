@@ -243,12 +243,51 @@ async function buildRoute(){
  $("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");
  try{
   const c=`${currentPosition.lon},${currentPosition.lat};${destination.lon},${destination.lat}`;
-  const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+c+"?overview=full&geometries=geojson&steps=false");
+  const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+c+"?overview=full&geometries=geojson&steps=true");
   if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");
   const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
   const route=d.routes[0];if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
-  summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div>';
+  summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
+   const stepsList=$("routeSteps");
+const steps=route.legs?.[0]?.steps||[];
+const turnNames={
+  "sharp right":"belok tajam ke kanan",
+  "right":"belok kanan",
+  "slight right":"belok sedikit ke kanan",
+  "straight":"teruskan perjalanan",
+  "slight left":"belok sedikit ke kiri",
+  "left":"belok kiri",
+  "sharp left":"belok tajam ke kiri",
+  "uturn":"pusing balik"
+};
+steps.forEach((step,i)=>{
+  const li=document.createElement("li");
+  const m=step.maneuver||{};
+  const type=m.type||"";
+  const modifier=m.modifier||"";
+  let instruction="Teruskan perjalanan";
+
+  if(type==="depart") instruction="Mulakan perjalanan";
+  else if(type==="arrive") instruction="Tiba di destinasi";
+  else if(type==="roundabout"||type==="rotary")
+    instruction=m.exit
+      ?"Masuk bulatan dan ambil jalan keluar ke-"+m.exit
+      :"Masuk bulatan";
+  else if(turnNames[modifier]) instruction=turnNames[modifier];
+  else if(type==="merge") instruction="Masuk ke laluan";
+  else if(type==="fork") instruction="Pilih cabang jalan";
+
+  if(step.name) instruction+=" ke "+step.name;
+
+  const metres=Math.round(step.distance||0);
+  const distance=metres>=1000
+    ?(metres/1000).toFixed(1)+" km"
+    :metres+" m";
+
+  li.textContent=(i+1)+". "+instruction+" — "+distance;
+  stepsList.appendChild(li);
+});
   summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success");
  }catch(e){setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error");}
  finally{$("routeBtn").disabled=!currentPosition||!destination;}
