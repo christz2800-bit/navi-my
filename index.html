@@ -106,7 +106,8 @@ const $=id=>document.getElementById(id);
 const statusEl=$("status"),summaryEl=$("routeSummary");
 let currentPosition=null,destination=null;
 let nearbySearchCenter=null;
-let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0;
+let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0,watchId=null;
+  let navigationSteps=[],currentStepIndex=0;
 const STORAGE_KEY="navimy_favorites_v04";
 const map=L.map("map",{zoomControl:true,scrollWheelZoom:false}).setView([4.2105,101.9758],6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
@@ -229,13 +230,47 @@ function chooseDestination(item){
 function locateMe(){
  if(!navigator.geolocation){setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");return;}
  $("locateBtn").disabled=true;setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
- navigator.geolocation.getCurrentPosition(p=>{
+ if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+watchId=navigator.geolocation.watchPosition(p=>{
   currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};nearbySearchCenter={lat:currentPosition.lat,lon:currentPosition.lon};$("nearbyBtn").disabled=false;
+  updateNavigation(currentPosition);
   if(userMarker)map.removeLayer(userMarker);
   userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");
   map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();$("routeBtn").disabled=!destination;
   setStatus("Lokasi diperoleh. Anggaran ketepatan GPS: "+Math.round(currentPosition.accuracy)+" meter.","success");$("locateBtn").disabled=false;
  },e=>{setStatus(e.code===1?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari.":e.code===2?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS.":"Permintaan lokasi tamat masa. Cuba lagi.","error");$("locateBtn").disabled=false;},{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+}
+  function updateNavigation(position){
+  if(!navigationSteps.length)return;
+
+  const distanceTo=step=>{
+    if(!Number.isFinite(step.lat)||!Number.isFinite(step.lon))return Infinity;
+
+    const R=6371000;
+    const dLat=(step.lat-position.lat)*Math.PI/180;
+    const dLon=(step.lon-position.lon)*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+
+      Math.cos(position.lat*Math.PI/180)*
+      Math.cos(step.lat*Math.PI/180)*
+      Math.sin(dLon/2)**2;
+
+    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  };
+
+  while(
+    currentStepIndex<navigationSteps.length-1&&
+    distanceTo(navigationSteps[currentStepIndex+1])<35
+  ){
+    currentStepIndex++;
+  }
+
+  const list=$("routeSteps");
+  if(!list)return;
+
+  Array.from(list.children).forEach((item,index)=>{
+    item.style.fontWeight=index===currentStepIndex?"800":"400";
+    item.style.color=index===currentStepIndex?"#ffbf52":"";
+  });
 }
 async function buildRoute(){
  if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
@@ -261,6 +296,8 @@ const turnNames={
   "sharp left":"belok tajam ke kiri",
   "uturn":"pusing balik"
 };
+   navigationSteps=[];
+currentStepIndex=0;
 steps.forEach((step,i)=>{
   const li=document.createElement("li");
   const m=step.maneuver||{};
@@ -287,6 +324,12 @@ steps.forEach((step,i)=>{
 
   li.textContent=instruction+" — "+distance;
   stepsList.appendChild(li);
+  navigationSteps.push({
+  lat:m.location?.[1],
+  lon:m.location?.[0],
+  instruction,
+  distance:step.distance||0
+});
 });
   summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success");
  }catch(e){setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error");}
