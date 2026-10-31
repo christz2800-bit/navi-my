@@ -439,7 +439,7 @@ function saveFavorite(){
  items.unshift({label,name:destination.name,display_name:destination.display_name,lat:destination.lat,lon:destination.lon});
  if(writeFavorites(items.slice(0,20))){$("favoriteName").value="";renderFavorites();setStatus("“"+label+"” disimpan dalam lokasi kegemaran pada peranti ini.","success");}
 }
-function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");}
+function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}activeRouteCoordinates=[];offRouteCount=0;lastRerouteAt=0;navigationSteps=[];currentStepIndex=0;summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");}
 $("searchBtn").addEventListener("click",searchDestination);$("nearbyBtn").addEventListener("click",nearbyPlaces);
 $("destination").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchDestination();}});
 $("destination").addEventListener("input",()=>{
