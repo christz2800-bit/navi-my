@@ -108,6 +108,7 @@ let currentPosition=null,destination=null;
 let nearbySearchCenter=null;
 let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0,watchId=null;
   let navigationSteps=[],currentStepIndex=0;
+  let activeRouteCoordinates=[],offRouteCount=0,lastRerouteAt=0,isRerouting=false;
 const STORAGE_KEY="navimy_favorites_v04";
 const map=L.map("map",{zoomControl:true,scrollWheelZoom:false}).setView([4.2105,101.9758],6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
@@ -234,6 +235,7 @@ function locateMe(){
 watchId=navigator.geolocation.watchPosition(p=>{
   currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};nearbySearchCenter={lat:currentPosition.lat,lon:currentPosition.lon};$("nearbyBtn").disabled=false;
   updateNavigation(currentPosition);
+  checkOffRoute(currentPosition);
   if(userMarker)map.removeLayer(userMarker);
   userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");
   map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();$("routeBtn").disabled=!destination;
@@ -295,7 +297,41 @@ function updateNavigation(position){
  });
 }
 
-async function buildRoute(){
+function checkOffRoute(position){
+ if(!activeRouteCoordinates.length||isRerouting)return;
+
+ const R=6371000;
+ let minDistance=Infinity;
+
+ for(const point of activeRouteCoordinates){
+  const dLat=(point[1]-position.lat)*Math.PI/180;
+  const dLon=(point[0]-position.lon)*Math.PI/180;
+  const lat1=position.lat*Math.PI/180;
+  const lat2=point[1]*Math.PI/180;
+
+  const a=Math.sin(dLat/2)**2+
+   Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+
+  const distance=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+  minDistance=Math.min(minDistance,distance);
+ }
+
+ const threshold=Math.max(35,Math.min(60,(position.accuracy||10)*2));
+
+ if(minDistance>threshold){
+  offRouteCount++;
+ }else{
+  offRouteCount=0;
+ }
+
+ if(offRouteCount>=3){
+  offRouteCount=0;
+  isRerouting=true;
+  setStatus("Anda tersasar. Mengira laluan baharu...");
+  buildRoute();
+ }
+}
+  async function buildRoute(){
  if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
  if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return;}
  $("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");
@@ -304,7 +340,8 @@ async function buildRoute(){
   const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+c+"?overview=full&geometries=geojson&steps=true");
   if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");
   const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
-  const route=d.routes[0];if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
+  const route=d.routes[0];
+   activeRouteCoordinates=route.geometry.coordinates;if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
   summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
    const stepsList=$("routeSteps");
@@ -356,7 +393,7 @@ steps.forEach((step,i)=>{
 });
   summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success");
  }catch(e){setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error");}
- finally{$("routeBtn").disabled=!currentPosition||!destination;}
+ finally{isRerouting=false;$("routeBtn").disabled=!currentPosition||!destination;}
 }
 function openExternal(provider){
  if(!destination){setStatus("Cari destinasi dahulu.","error");return;}
