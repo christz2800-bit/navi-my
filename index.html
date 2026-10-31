@@ -300,23 +300,39 @@ function updateNavigation(position){
 function checkOffRoute(position){
  if(!activeRouteCoordinates.length||isRerouting)return;
 
- const R=6371000;
- let minDistance=Infinity;
-
- for(const point of activeRouteCoordinates){
-  const dLat=(point[1]-position.lat)*Math.PI/180;
-  const dLon=(point[0]-position.lon)*Math.PI/180;
-  const lat1=position.lat*Math.PI/180;
-  const lat2=point[1]*Math.PI/180;
-
-  const a=Math.sin(dLat/2)**2+
-   Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
-
-  const distance=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  minDistance=Math.min(minDistance,distance);
+ const accuracy=Number.isFinite(position.accuracy)?position.accuracy:Infinity;
+ if(accuracy>50){
+  offRouteCount=0;
+  return;
  }
 
- const threshold=Math.max(35,Math.min(60,(position.accuracy||10)*2));
+ const R=6371000;
+ const lat0=position.lat*Math.PI/180;
+ const cosLat=Math.cos(lat0);
+ let minDistance=Infinity;
+
+ for(let i=1;i<activeRouteCoordinates.length;i++){
+  const p1=activeRouteCoordinates[i-1];
+  const p2=activeRouteCoordinates[i];
+
+  const ax=R*(p1[0]-position.lon)*Math.PI/180*cosLat;
+  const ay=R*(p1[1]-position.lat)*Math.PI/180;
+  const bx=R*(p2[0]-position.lon)*Math.PI/180*cosLat;
+  const by=R*(p2[1]-position.lat)*Math.PI/180;
+
+  const dx=bx-ax;
+  const dy=by-ay;
+  const lengthSquared=dx*dx+dy*dy;
+
+  const t=lengthSquared===0?0:Math.max(0,Math.min(1,-(ax*dx+ay*dy)/lengthSquared));
+
+  const nearestX=ax+t*dx;
+  const nearestY=ay+t*dy;
+
+  minDistance=Math.min(minDistance,Math.hypot(nearestX,nearestY));
+ }
+
+ const threshold=Math.max(35,Math.min(75,accuracy*2));
 
  if(minDistance>threshold){
   offRouteCount++;
@@ -324,14 +340,16 @@ function checkOffRoute(position){
   offRouteCount=0;
  }
 
- if(offRouteCount>=3){
+ const now=Date.now();
+
+ if(offRouteCount>=3&&now-lastRerouteAt>=15000){
   offRouteCount=0;
+  lastRerouteAt=now;
   isRerouting=true;
   setStatus("Anda tersasar. Mengira laluan baharu...");
   buildRoute();
  }
-}
-  async function buildRoute(){
+}  async function buildRoute(){
  if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
  if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return;}
  $("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");
