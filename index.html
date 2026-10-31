@@ -240,38 +240,61 @@ watchId=navigator.geolocation.watchPosition(p=>{
   setStatus("Lokasi diperoleh. Anggaran ketepatan GPS: "+Math.round(currentPosition.accuracy)+" meter.","success");$("locateBtn").disabled=false;
  },e=>{setStatus(e.code===1?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari.":e.code===2?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS.":"Permintaan lokasi tamat masa. Cuba lagi.","error");$("locateBtn").disabled=false;},{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
 }
-  function updateNavigation(position){
-  if(!navigationSteps.length)return;
+  
+function updateNavigation(position){
+ if(!navigationSteps.length)return;
 
-  const distanceTo=step=>{
-    if(!Number.isFinite(step.lat)||!Number.isFinite(step.lon))return Infinity;
+ const distanceTo=step=>{
+   if(!Number.isFinite(step.lat)||!Number.isFinite(step.lon))return Infinity;
 
-    const R=6371000;
-    const dLat=(step.lat-position.lat)*Math.PI/180;
-    const dLon=(step.lon-position.lon)*Math.PI/180;
-    const a=Math.sin(dLat/2)**2+
-      Math.cos(position.lat*Math.PI/180)*
-      Math.cos(step.lat*Math.PI/180)*
-      Math.sin(dLon/2)**2;
+   const R=6371000;
+   const dLat=(step.lat-position.lat)*Math.PI/180;
+   const dLon=(step.lon-position.lon)*Math.PI/180;
+   const a=Math.sin(dLat/2)**2+
+     Math.cos(position.lat*Math.PI/180)*
+     Math.cos(step.lat*Math.PI/180)*
+     Math.sin(dLon/2)**2;
 
-    return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-  };
+   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+ };
 
-  while(
-    currentStepIndex<navigationSteps.length-1&&
-    distanceTo(navigationSteps[currentStepIndex+1])<35
-  ){
-    currentStepIndex++;
-  }
+ const nextIndex=currentStepIndex+1;
 
-  const list=$("routeSteps");
-  if(!list)return;
+ if(nextIndex<navigationSteps.length){
+   const accuracy=Number.isFinite(position.accuracy)
+     ?position.accuracy:10;
 
-  Array.from(list.children).forEach((item,index)=>{
-    item.style.fontWeight=index===currentStepIndex?"800":"400";
-    item.style.color=index===currentStepIndex?"#ffbf52":"";
-  });
+   const threshold=Math.min(40,Math.max(20,accuracy*1.5));
+   const distance=distanceTo(navigationSteps[nextIndex]);
+
+   if(distance<=threshold){
+     if(updateNavigation.pendingStep===nextIndex){
+       updateNavigation.pendingCount++;
+     }else{
+       updateNavigation.pendingStep=nextIndex;
+       updateNavigation.pendingCount=1;
+     }
+
+     if(updateNavigation.pendingCount>=2){
+       currentStepIndex=nextIndex;
+       updateNavigation.pendingStep=null;
+       updateNavigation.pendingCount=0;
+     }
+   }else{
+     updateNavigation.pendingStep=null;
+     updateNavigation.pendingCount=0;
+   }
+ }
+
+ const list=$("routeSteps");
+ if(!list)return;
+
+ Array.from(list.children).forEach((item,index)=>{
+   item.style.fontWeight=index===currentStepIndex?"800":"400";
+   item.style.color=index===currentStepIndex?"#ffbf52":"";
+ });
 }
+
 async function buildRoute(){
  if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
  if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return;}
