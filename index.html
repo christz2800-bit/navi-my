@@ -229,6 +229,7 @@ async function searchDestination(){
  finally{$("searchBtn").disabled=false;}
 }
 function chooseDestination(item){
+  clearRoute();
  reverseRequest++;destination=normalize(item);nearbySearchCenter={lat:destination.lat,lon:destination.lon};$("destination").value=destination.name;closeSuggestions();
  showDestinationMarker();map.setView([destination.lat,destination.lon],15);destinationMarker.openPopup();
  $("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;$("nearbyBtn").disabled=false;summaryEl.hidden=true;
@@ -425,6 +426,9 @@ function checkOffRoute(position){
   if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");
   const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
   const route=d.routes[0];
+   if(!route.geometry||!Array.isArray(route.geometry.coordinates)||route.geometry.coordinates.length<2){
+ throw Error("Geometri laluan tidak sah.");
+}
    const newLayer=L.geoJSON(route.geometry,{  style:{color:"#ffb52e",weight:6,opacity:.92} }).addTo(map);  if(routeLayer)map.removeLayer(routeLayer);  routeLayer=newLayer; activeRouteCoordinates=route.geometry.coordinates; offRouteCount=0;  map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
   summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
@@ -513,6 +517,7 @@ function clearRoute(){
  activeRouteCoordinates=[];
  offRouteCount=0;
  lastRerouteAt=0;
+  isRerouting=false;
  navigationSteps=[];
  currentStepIndex=0;
  updateNavigation.pendingStep=null;
