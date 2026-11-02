@@ -359,7 +359,7 @@ function checkOffRoute(position){
   if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");
   const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
   const route=d.routes[0];
-   activeRouteCoordinates=route.geometry.coordinates;if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
+   const newLayer=L.geoJSON(route.geometry,{  style:{color:"#ffb52e",weight:6,opacity:.92} }).addTo(map);  if(routeLayer)map.removeLayer(routeLayer);  routeLayer=newLayer; activeRouteCoordinates=route.geometry.coordinates; offRouteCount=0;  map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
   summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
    const stepsList=$("routeSteps");
@@ -439,7 +439,21 @@ function saveFavorite(){
  items.unshift({label,name:destination.name,display_name:destination.display_name,lat:destination.lat,lon:destination.lon});
  if(writeFavorites(items.slice(0,20))){$("favoriteName").value="";renderFavorites();setStatus("“"+label+"” disimpan dalam lokasi kegemaran pada peranti ini.","success");}
 }
-function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}activeRouteCoordinates=[];offRouteCount=0;lastRerouteAt=0;navigationSteps=[];currentStepIndex=0;summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");}
+function clearRoute(){
+ if(routeLayer){
+  map.removeLayer(routeLayer);
+  routeLayer=null;
+ }
+ activeRouteCoordinates=[];
+ offRouteCount=0;
+ lastRerouteAt=0;
+ navigationSteps=[];
+ currentStepIndex=0;
+ updateNavigation.pendingStep=null;
+ updateNavigation.pendingCount=0;
+ summaryEl.hidden=true;
+ setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");
+}
 $("searchBtn").addEventListener("click",searchDestination);$("nearbyBtn").addEventListener("click",nearbyPlaces);
 $("destination").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchDestination();}});
 $("destination").addEventListener("input",()=>{
