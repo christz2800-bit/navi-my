@@ -207,7 +207,13 @@ function updateDestinationFromMarker(){
 function showDestinationMarker(){
  if(destinationMarker)map.removeLayer(destinationMarker);
  destinationMarker=L.marker([destination.lat,destination.lon],{draggable:true,autoPan:true}).addTo(map);
- destinationMarker.bindPopup(popupContent());destinationMarker.on("dragend",updateDestinationFromMarker);
+ destinationMarker.bindPopup(popupContent(),{
+  maxWidth:360,
+  maxHeight:260,
+  autoPan:true,
+  keepInView:true,
+  closeOnClick:false
+});destinationMarker.on("dragend",updateDestinationFromMarker);
 }
 function showSuggestions(items){
  const box=$("suggestions");box.replaceChildren();
