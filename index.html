@@ -229,18 +229,78 @@ function chooseDestination(item){
  setStatus("Destinasi dipilih: "+destination.display_name+". Semak kedudukan pin. Jika pin tidak tepat, seret ke pintu masuk yang dikehendaki; koordinat pin akan digunakan untuk laluan.");
 }
 function locateMe(){
- if(!navigator.geolocation){setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");return;}
- $("locateBtn").disabled=true;setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+ if(!navigator.geolocation){
+  setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");
+  return;
+ }
+
+ $("locateBtn").disabled=true;
+ setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+
  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
-watchId=navigator.geolocation.watchPosition(p=>{
-  currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};nearbySearchCenter={lat:currentPosition.lat,lon:currentPosition.lon};$("nearbyBtn").disabled=false;
+
+ let firstFix=true;
+
+ watchId=navigator.geolocation.watchPosition(p=>{
+  currentPosition={
+   lat:p.coords.latitude,
+   lon:p.coords.longitude,
+   accuracy:p.coords.accuracy
+  };
+
+  nearbySearchCenter={
+   lat:currentPosition.lat,
+   lon:currentPosition.lon
+  };
+
+  $("nearbyBtn").disabled=false;
+
   updateNavigation(currentPosition);
   checkOffRoute(currentPosition);
+
   if(userMarker)map.removeLayer(userMarker);
-  userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");
-  map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();$("routeBtn").disabled=!destination;
-  setStatus("Lokasi diperoleh. Anggaran ketepatan GPS: "+Math.round(currentPosition.accuracy)+" meter.","success");$("locateBtn").disabled=false;
- },e=>{setStatus(e.code===1?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari.":e.code===2?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS.":"Permintaan lokasi tamat masa. Cuba lagi.","error");$("locateBtn").disabled=false;},{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+
+  userMarker=L.circleMarker(
+   [currentPosition.lat,currentPosition.lon],
+   {radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}
+  ).addTo(map).bindPopup(
+   "Lokasi semasa anda<br>Ketepatan GPS: "+
+   Math.round(currentPosition.accuracy)+" m"
+  );
+
+  if(firstFix){
+   map.setView([currentPosition.lat,currentPosition.lon],15);
+   userMarker.openPopup();
+   firstFix=false;
+  }
+
+  $("routeBtn").disabled=!destination;
+
+  setStatus(
+   "Lokasi diperoleh. Anggaran ketepatan GPS: "+
+   Math.round(currentPosition.accuracy)+" meter.",
+   "success"
+  );
+
+  $("locateBtn").disabled=false;
+
+ },e=>{
+  setStatus(
+   e.code===1
+    ?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari."
+    :e.code===2
+     ?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS."
+     :"Permintaan lokasi tamat masa. Cuba lagi.",
+   "error"
+  );
+
+  $("locateBtn").disabled=false;
+
+ },{
+  enableHighAccuracy:true,
+  timeout:15000,
+  maximumAge:10000
+ });
 }
   
 function updateNavigation(position){
