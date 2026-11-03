@@ -116,7 +116,24 @@ setTimeout(()=>map.invalidateSize(),250);
 function setStatus(msg,kind=""){statusEl.className="panel"+(kind?" "+kind:"");statusEl.textContent=msg;}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function closeSuggestions(){$("suggestions").classList.remove("show");$("suggestions").replaceChildren();}
-function normalize(item){return {lat:Number(item.lat),lon:Number(item.lon),name:item.name||(item.display_name||"Destinasi").split(",")[0],display_name:item.display_name||item.name||"Destinasi"};}
+function cleanLocationText(text){
+  if(!text)return "";
+  return String(text)
+    .replace(/\bLoronga\b/gi,"Lorong")
+    .trim();
+}
+
+function normalize(item){
+  const displayName=cleanLocationText(item.display_name||item.name||"Destinasi");
+  const name=cleanLocationText(item.name||displayName.split(",")[0]||"Destinasi");
+
+  return {
+    lat:Number(item.lat),
+    lon:Number(item.lon),
+    name,
+    display_name:displayName
+  };
+}
 async function geocode(q,limit=5){
  const u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit="+limit+"&countrycodes=my&q="+encodeURIComponent(q);
  const r=await fetch(u,{headers:{"Accept":"application/json"}});
@@ -165,7 +182,7 @@ async function nearbyPlaces(){
   if(!data||!Array.isArray(data.elements))throw Error(data&&data.error?data.error:"Respons carian tidak sah");
   const items=[],seen=new Set();
   for(const el of data.elements){
-   const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=el.tags?.name;
+   const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=cleanLocationText(el.tags?.name);
    if(!name||!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))continue;
    const point={lat:Number(lat),lon:Number(lon)},key=point.lat.toFixed(5)+","+point.lon.toFixed(5);
    if(seen.has(key))continue;seen.add(key);
@@ -199,7 +216,8 @@ function updateDestinationFromMarker(){
  setStatus("Pin dialihkan. Koordinat tepat telah dikemas kini. Sedang cuba mengenal pasti nama/alamat di lokasi baharu…","success");
  reverseGeocode(p.lat,p.lng).then(item=>{
   if(requestId!==reverseRequest||!destination)return;
-  const address=(item&&item.display_name)||"",named=(item&&item.name)||"";
+  const address=cleanLocationText((item&&item.display_name)||"");
+const named=cleanLocationText((item&&item.name)||"");
   if(address){destination.display_name=address;destination.name=named||address.split(",")[0]||"Lokasi pilihan";$("destination").value=destination.name;destinationMarker.setPopupContent(popupContent());setStatus("Lokasi pin dikemas kini: "+destination.display_name+". Laluan dan navigasi luar akan menggunakan koordinat pin ini.","success");}
   else setStatus("Koordinat pin dikemas kini, tetapi nama rasmi tidak ditemui. Koordinat tepat tetap digunakan untuk laluan dan navigasi luar.","success");
  }).catch(()=>{if(requestId===reverseRequest)setStatus("Koordinat pin dikemas kini. Nama/alamat tidak dapat dikenal pasti sekarang, tetapi laluan dan navigasi luar tetap menggunakan koordinat tepat.","success");});
@@ -216,10 +234,35 @@ function showDestinationMarker(){
 });destinationMarker.on("dragend",updateDestinationFromMarker);
 }
 function showSuggestions(items){
- const box=$("suggestions");box.replaceChildren();
- if(!items.length){const d=document.createElement("div");d.className="suggestion";d.textContent="Tiada hasil ditemui. Cuba nama tempat atau alamat yang lebih lengkap.";box.appendChild(d);}
- else items.forEach(item=>{const b=document.createElement("button");b.type="button";b.className="suggestion";b.innerHTML=esc(item.name)+"<small>"+esc(item.display_name.length>140?item.display_name.slice(0,139)+"…":item.display_name)+"</small>";b.addEventListener("click",()=>chooseDestination(item));box.appendChild(b);});
- box.classList.add("show");
+  const box=$("suggestions");
+  box.replaceChildren();
+
+  if(!items.length){
+    const d=document.createElement("div");
+    d.className="suggestion";
+    d.textContent="Tiada hasil ditemui. Cuba nama tempat atau alamat yang lebih lengkap.";
+    box.appendChild(d);
+  }else{
+    items.forEach(item=>{
+      const name=cleanLocationText(item.name);
+      const displayName=cleanLocationText(item.display_name);
+      const b=document.createElement("button");
+
+      b.type="button";
+      b.className="suggestion";
+      b.innerHTML=esc(name)+"<small>"+esc(displayName.length>140?displayName.slice(0,139)+"…":displayName)+"</small>";
+
+      b.addEventListener("click",()=>chooseDestination({
+        ...item,
+        name,
+        display_name:displayName
+      }));
+
+      box.appendChild(b);
+    });
+  }
+
+  box.classList.add("show");
 }
 async function searchDestination(){
  const q=$("destination").value.trim();if(q.length<2){setStatus("Masukkan sekurang-kurangnya 2 aksara untuk mencari destinasi.","error");return;}
