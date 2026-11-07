@@ -105,6 +105,8 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 const $=id=>document.getElementById(id);
 const statusEl=$("status"),summaryEl=$("routeSummary");
 let currentPosition=null,destination=null;
+  let lastGpsFixAt=0,gpsAvailable=false;
+let routeProgressIndex=0;
 let nearbySearchCenter=null;
 let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0,watchId=null;
   let navigationSteps=[],currentStepIndex=0;
@@ -297,6 +299,8 @@ function locateMe(){
    lon:p.coords.longitude,
    accuracy:p.coords.accuracy
   };
+   lastGpsFixAt=Date.now();
+gpsAvailable=true;
 
   nearbySearchCenter={
    lat:currentPosition.lat,
@@ -335,6 +339,8 @@ function locateMe(){
   $("locateBtn").disabled=false;
 
  },e=>{
+   gpsAvailable=false;
+offRouteCount=0;
   setStatus(
    e.code===1
     ?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari."
@@ -409,6 +415,10 @@ function updateNavigation(position){
 
 function checkOffRoute(position){
  if(!activeRouteCoordinates.length||isRerouting)return;
+  if(!gpsAvailable||!lastGpsFixAt||Date.now()-lastGpsFixAt>30000){
+  offRouteCount=0;
+  return;
+}
 
  const accuracy=Number.isFinite(position.accuracy)?position.accuracy:Infinity;
  if(accuracy>50){
@@ -420,8 +430,9 @@ function checkOffRoute(position){
  const lat0=position.lat*Math.PI/180;
  const cosLat=Math.cos(lat0);
  let minDistance=Infinity;
+  let nearestSegmentIndex=routeProgressIndex;
 
- for(let i=1;i<activeRouteCoordinates.length;i++){
+ for(let i=Math.max(1,routeProgressIndex+1);i<activeRouteCoordinates.length;i++){
   const p1=activeRouteCoordinates[i-1];
   const p2=activeRouteCoordinates[i];
 
@@ -439,10 +450,17 @@ function checkOffRoute(position){
   const nearestX=ax+t*dx;
   const nearestY=ay+t*dy;
 
-  minDistance=Math.min(minDistance,Math.hypot(nearestX,nearestY));
+  const segmentDistance=Math.hypot(nearestX,nearestY);
+if(segmentDistance<minDistance){
+  minDistance=segmentDistance;
+  nearestSegmentIndex=i;
+}
  }
 
- const threshold=Math.max(35,Math.min(75,accuracy*2));
+ if(minDistance<=Math.max(35,Math.min(75,accuracy*2))){
+  routeProgressIndex=Math.max(routeProgressIndex,nearestSegmentIndex);
+}
+  const threshold=Math.max(35,Math.min(75,accuracy*2));
 
  if(minDistance>threshold){
   offRouteCount++;
@@ -461,7 +479,12 @@ function checkOffRoute(position){
  }
 }  async function buildRoute(){
   const requestId=++routeRequestId;
- if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
+if(!currentPosition||!gpsAvailable||!lastGpsFixAt||Date.now()-lastGpsFixAt>30000){
+ isRerouting=false;
+ offRouteCount=0;
+ setStatus("Lokasi GPS tidak terkini. Tekan LOKASI SAYA untuk mendapatkan lokasi baharu.","error");
+ return;
+}
  if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return;}
  $("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");
  try{
@@ -475,7 +498,7 @@ function checkOffRoute(position){
    if(!route.geometry||!Array.isArray(route.geometry.coordinates)||route.geometry.coordinates.length<2){
  throw Error("Geometri laluan tidak sah.");
 }
-   const newLayer=L.geoJSON(route.geometry,{  style:{color:"#ffb52e",weight:6,opacity:.92} }).addTo(map);  if(routeLayer)map.removeLayer(routeLayer);  routeLayer=newLayer; activeRouteCoordinates=route.geometry.coordinates; offRouteCount=0;  map.fitBounds(newLayer.getBounds(),{padding:[28,28]});
+   const newLayer=L.geoJSON(route.geometry,{  style:{color:"#ffb52e",weight:6,opacity:.92} }).addTo(map);  if(routeLayer)map.removeLayer(routeLayer);  routeLayer=newLayer; activeRouteCoordinates=route.geometry.coordinates; offRouteCount=0; routeProgressIndex=0;map.fitBounds(newLayer.getBounds(),{padding:[28,28]});
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
   summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
    const stepsList=$("routeSteps");
@@ -562,6 +585,7 @@ function clearRoute(){
   routeLayer=null;
  }
  activeRouteCoordinates=[];
+routeProgressIndex=0;
  offRouteCount=0;
  lastRerouteAt=0;
   isRerouting=false;
