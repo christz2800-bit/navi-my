@@ -606,7 +606,7 @@ $("destination").addEventListener("input",()=>{
 });
 document.addEventListener("click",e=>{if(!e.target.closest(".search-wrap"))closeSuggestions();});
 map.on("click",e=>{if(!destination){nearbySearchCenter={lat:e.latlng.lat,lon:e.latlng.lng};$("nearbyBtn").disabled=false;setStatus("Pusat carian tempat berhampiran ditetapkan pada peta. Tekan CARI TEMPAT BERHAMPIRAN untuk melihat tempat bernama sekitar titik ini.");}});
-$("locateBtn").addEventListener("click",locateMe);$("routeBtn").addEventListener("click",buildRoute);
+$("locateBtn").addEventListener("click",locateMe);$("routeBtn").addEventListener("click",()=>buildRoute(false));
 $("appleBtn").addEventListener("click",()=>openExternal("apple"));$("googleBtn").addEventListener("click",()=>openExternal("google"));
 $("recenterBtn").addEventListener("click",()=>{if(currentPosition)map.setView([currentPosition.lat,currentPosition.lon],15);else if(destination)map.setView([destination.lat,destination.lon],15);else map.setView([4.2105,101.9758],6);});
 $("clearRouteBtn").addEventListener("click",clearRoute);$("saveFavoriteBtn").addEventListener("click",saveFavorite);
