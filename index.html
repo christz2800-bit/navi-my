@@ -432,7 +432,7 @@ function checkOffRoute(position){
  let minDistance=Infinity;
   let nearestSegmentIndex=routeProgressIndex;
 
- for(let i=Math.max(1,routeProgressIndex+1);i<activeRouteCoordinates.length;i++){
+ for(let i=Math.max(1,Math.min(routeProgressIndex,activeRouteCoordinates.length-1));i<activeRouteCoordinates.length;i++){
   const p1=activeRouteCoordinates[i-1];
   const p2=activeRouteCoordinates[i];
 
