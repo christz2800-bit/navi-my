@@ -105,9 +105,12 @@ button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
 const $=id=>document.getElementById(id);
 const statusEl=$("status"),summaryEl=$("routeSummary");
 let currentPosition=null,destination=null;
+  let lastGpsFixAt=0,gpsAvailable=false;
+let routeProgressIndex=0;
 let nearbySearchCenter=null;
 let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0,watchId=null;
   let navigationSteps=[],currentStepIndex=0;
+  let activeRouteCoordinates=[],offRouteCount=0,lastRerouteAt=0,isRerouting=false,routeRequestId=0;
 const STORAGE_KEY="navimy_favorites_v04";
 const map=L.map("map",{zoomControl:true,scrollWheelZoom:false}).setView([4.2105,101.9758],6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
@@ -115,7 +118,24 @@ setTimeout(()=>map.invalidateSize(),250);
 function setStatus(msg,kind=""){statusEl.className="panel"+(kind?" "+kind:"");statusEl.textContent=msg;}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function closeSuggestions(){$("suggestions").classList.remove("show");$("suggestions").replaceChildren();}
-function normalize(item){return {lat:Number(item.lat),lon:Number(item.lon),name:item.name||(item.display_name||"Destinasi").split(",")[0],display_name:item.display_name||item.name||"Destinasi"};}
+function cleanLocationText(text){
+  if(!text)return "";
+  return String(text)
+    .replace(/\bLoronga\b/gi,"Lorong")
+    .trim();
+}
+
+function normalize(item){
+  const displayName=cleanLocationText(item.display_name||item.name||"Destinasi");
+  const name=cleanLocationText(item.name||displayName.split(",")[0]||"Destinasi");
+
+  return {
+    lat:Number(item.lat),
+    lon:Number(item.lon),
+    name,
+    display_name:displayName
+  };
+}
 async function geocode(q,limit=5){
  const u="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit="+limit+"&countrycodes=my&q="+encodeURIComponent(q);
  const r=await fetch(u,{headers:{"Accept":"application/json"}});
@@ -164,7 +184,7 @@ async function nearbyPlaces(){
   if(!data||!Array.isArray(data.elements))throw Error(data&&data.error?data.error:"Respons carian tidak sah");
   const items=[],seen=new Set();
   for(const el of data.elements){
-   const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=el.tags?.name;
+   const lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon,name=cleanLocationText(el.tags?.name);
    if(!name||!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))continue;
    const point={lat:Number(lat),lon:Number(lon)},key=point.lat.toFixed(5)+","+point.lon.toFixed(5);
    if(seen.has(key))continue;seen.add(key);
@@ -198,7 +218,8 @@ function updateDestinationFromMarker(){
  setStatus("Pin dialihkan. Koordinat tepat telah dikemas kini. Sedang cuba mengenal pasti nama/alamat di lokasi baharu…","success");
  reverseGeocode(p.lat,p.lng).then(item=>{
   if(requestId!==reverseRequest||!destination)return;
-  const address=(item&&item.display_name)||"",named=(item&&item.name)||"";
+  const address=cleanLocationText((item&&item.display_name)||"");
+const named=cleanLocationText((item&&item.name)||"");
   if(address){destination.display_name=address;destination.name=named||address.split(",")[0]||"Lokasi pilihan";$("destination").value=destination.name;destinationMarker.setPopupContent(popupContent());setStatus("Lokasi pin dikemas kini: "+destination.display_name+". Laluan dan navigasi luar akan menggunakan koordinat pin ini.","success");}
   else setStatus("Koordinat pin dikemas kini, tetapi nama rasmi tidak ditemui. Koordinat tepat tetap digunakan untuk laluan dan navigasi luar.","success");
  }).catch(()=>{if(requestId===reverseRequest)setStatus("Koordinat pin dikemas kini. Nama/alamat tidak dapat dikenal pasti sekarang, tetapi laluan dan navigasi luar tetap menggunakan koordinat tepat.","success");});
@@ -206,13 +227,44 @@ function updateDestinationFromMarker(){
 function showDestinationMarker(){
  if(destinationMarker)map.removeLayer(destinationMarker);
  destinationMarker=L.marker([destination.lat,destination.lon],{draggable:true,autoPan:true}).addTo(map);
- destinationMarker.bindPopup(popupContent());destinationMarker.on("dragend",updateDestinationFromMarker);
+ destinationMarker.bindPopup(popupContent(),{
+  maxWidth:360,
+  maxHeight:260,
+  autoPan:false,
+keepInView:false,
+  closeOnClick:false
+});destinationMarker.on("dragend",updateDestinationFromMarker);
 }
 function showSuggestions(items){
- const box=$("suggestions");box.replaceChildren();
- if(!items.length){const d=document.createElement("div");d.className="suggestion";d.textContent="Tiada hasil ditemui. Cuba nama tempat atau alamat yang lebih lengkap.";box.appendChild(d);}
- else items.forEach(item=>{const b=document.createElement("button");b.type="button";b.className="suggestion";b.innerHTML=esc(item.name)+"<small>"+esc(item.display_name.length>140?item.display_name.slice(0,139)+"…":item.display_name)+"</small>";b.addEventListener("click",()=>chooseDestination(item));box.appendChild(b);});
- box.classList.add("show");
+  const box=$("suggestions");
+  box.replaceChildren();
+
+  if(!items.length){
+    const d=document.createElement("div");
+    d.className="suggestion";
+    d.textContent="Tiada hasil ditemui. Cuba nama tempat atau alamat yang lebih lengkap.";
+    box.appendChild(d);
+  }else{
+    items.forEach(item=>{
+      const name=cleanLocationText(item.name);
+      const displayName=cleanLocationText(item.display_name);
+      const b=document.createElement("button");
+
+      b.type="button";
+      b.className="suggestion";
+      b.innerHTML=esc(name)+"<small>"+esc(displayName.length>140?displayName.slice(0,139)+"…":displayName)+"</small>";
+
+      b.addEventListener("click",()=>chooseDestination({
+        ...item,
+        name,
+        display_name:displayName
+      }));
+
+      box.appendChild(b);
+    });
+  }
+
+  box.classList.add("show");
 }
 async function searchDestination(){
  const q=$("destination").value.trim();if(q.length<2){setStatus("Masukkan sekurang-kurangnya 2 aksara untuk mencari destinasi.","error");return;}
@@ -222,23 +274,89 @@ async function searchDestination(){
  finally{$("searchBtn").disabled=false;}
 }
 function chooseDestination(item){
+  clearRoute();
  reverseRequest++;destination=normalize(item);nearbySearchCenter={lat:destination.lat,lon:destination.lon};$("destination").value=destination.name;closeSuggestions();
  showDestinationMarker();map.setView([destination.lat,destination.lon],15);destinationMarker.openPopup();
  $("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;$("nearbyBtn").disabled=false;summaryEl.hidden=true;
  setStatus("Destinasi dipilih: "+destination.display_name+". Semak kedudukan pin. Jika pin tidak tepat, seret ke pintu masuk yang dikehendaki; koordinat pin akan digunakan untuk laluan.");
 }
 function locateMe(){
- if(!navigator.geolocation){setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");return;}
- $("locateBtn").disabled=true;setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+ if(!navigator.geolocation){
+  setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");
+  return;
+ }
+
+ $("locateBtn").disabled=true;
+ setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+
  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
-watchId=navigator.geolocation.watchPosition(p=>{
-  currentPosition={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};nearbySearchCenter={lat:currentPosition.lat,lon:currentPosition.lon};$("nearbyBtn").disabled=false;
+
+ let firstFix=true;
+
+ watchId=navigator.geolocation.watchPosition(p=>{
+  currentPosition={
+   lat:p.coords.latitude,
+   lon:p.coords.longitude,
+   accuracy:p.coords.accuracy
+  };
+   lastGpsFixAt=Date.now();
+gpsAvailable=true;
+
+  nearbySearchCenter={
+   lat:currentPosition.lat,
+   lon:currentPosition.lon
+  };
+
+  $("nearbyBtn").disabled=false;
+
   updateNavigation(currentPosition);
+  checkOffRoute(currentPosition);
+
   if(userMarker)map.removeLayer(userMarker);
-  userMarker=L.circleMarker([currentPosition.lat,currentPosition.lon],{radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}).addTo(map).bindPopup("Lokasi semasa anda<br>Ketepatan GPS: "+Math.round(currentPosition.accuracy)+" m");
-  map.setView([currentPosition.lat,currentPosition.lon],15);userMarker.openPopup();$("routeBtn").disabled=!destination;
-  setStatus("Lokasi diperoleh. Anggaran ketepatan GPS: "+Math.round(currentPosition.accuracy)+" meter.","success");$("locateBtn").disabled=false;
- },e=>{setStatus(e.code===1?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari.":e.code===2?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS.":"Permintaan lokasi tamat masa. Cuba lagi.","error");$("locateBtn").disabled=false;},{enableHighAccuracy:true,timeout:15000,maximumAge:10000});
+
+  userMarker=L.circleMarker(
+   [currentPosition.lat,currentPosition.lon],
+   {radius:9,color:"#fff",weight:3,fillColor:"#1595ff",fillOpacity:1}
+  ).addTo(map).bindPopup(
+   "Lokasi semasa anda<br>Ketepatan GPS: "+
+   Math.round(currentPosition.accuracy)+" m"
+  );
+
+  if(firstFix){
+   map.setView([currentPosition.lat,currentPosition.lon],15);
+   userMarker.openPopup();
+   firstFix=false;
+  }
+
+  $("routeBtn").disabled=!destination;
+
+  setStatus(
+   "Lokasi diperoleh. Anggaran ketepatan GPS: "+
+   Math.round(currentPosition.accuracy)+" meter.",
+   "success"
+  );
+
+  $("locateBtn").disabled=false;
+
+ },e=>{
+   gpsAvailable=false;
+offRouteCount=0;
+  setStatus(
+   e.code===1
+    ?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari."
+    :e.code===2
+     ?"Lokasi tidak tersedia. Cuba di luar bangunan atau semak GPS."
+     :"Permintaan lokasi tamat masa. Cuba lagi.",
+   "error"
+  );
+
+  $("locateBtn").disabled=false;
+
+ },{
+  enableHighAccuracy:true,
+  timeout:15000,
+  maximumAge:10000
+ });
 }
   
 function updateNavigation(position){
@@ -295,16 +413,94 @@ function updateNavigation(position){
  });
 }
 
-async function buildRoute(){
- if(!currentPosition){setStatus("Tekan “LOKASI SAYA” dahulu sebelum membina laluan.","error");return;}
+function checkOffRoute(position){
+ if(!activeRouteCoordinates.length||isRerouting)return;
+  if(!gpsAvailable||!lastGpsFixAt||Date.now()-lastGpsFixAt>30000){
+  offRouteCount=0;
+  return;
+}
+
+ const accuracy=Number.isFinite(position.accuracy)?position.accuracy:Infinity;
+ if(accuracy>50){
+  offRouteCount=0;
+  return;
+ }
+
+ const R=6371000;
+ const lat0=position.lat*Math.PI/180;
+ const cosLat=Math.cos(lat0);
+ let minDistance=Infinity;
+  let nearestSegmentIndex=routeProgressIndex;
+
+ for(let i=Math.max(1,routeProgressIndex+1);i<activeRouteCoordinates.length;i++){
+  const p1=activeRouteCoordinates[i-1];
+  const p2=activeRouteCoordinates[i];
+
+  const ax=R*(p1[0]-position.lon)*Math.PI/180*cosLat;
+  const ay=R*(p1[1]-position.lat)*Math.PI/180;
+  const bx=R*(p2[0]-position.lon)*Math.PI/180*cosLat;
+  const by=R*(p2[1]-position.lat)*Math.PI/180;
+
+  const dx=bx-ax;
+  const dy=by-ay;
+  const lengthSquared=dx*dx+dy*dy;
+
+  const t=lengthSquared===0?0:Math.max(0,Math.min(1,-(ax*dx+ay*dy)/lengthSquared));
+
+  const nearestX=ax+t*dx;
+  const nearestY=ay+t*dy;
+
+  const segmentDistance=Math.hypot(nearestX,nearestY);
+if(segmentDistance<minDistance){
+  minDistance=segmentDistance;
+  nearestSegmentIndex=i;
+}
+ }
+
+ if(minDistance<=Math.max(35,Math.min(75,accuracy*2))){
+  routeProgressIndex=Math.max(routeProgressIndex,nearestSegmentIndex);
+}
+  const threshold=Math.max(35,Math.min(75,accuracy*2));
+
+ if(minDistance>threshold){
+  offRouteCount++;
+ }else{
+  offRouteCount=0;
+ }
+
+ const now=Date.now();
+
+ if(offRouteCount>=3&&now-lastRerouteAt>=15000){
+  offRouteCount=0;
+  lastRerouteAt=now;
+  isRerouting=true;
+  setStatus("Anda tersasar. Mengira laluan baharu...");
+  buildRoute(true);
+ }
+}  async function buildRoute(isAutomatic=false){
+  const requestId=++routeRequestId;
+if(!currentPosition||!gpsAvailable||!lastGpsFixAt||Date.now()-lastGpsFixAt>30000){
+ isRerouting=false;
+ offRouteCount=0;
+ setStatus("Lokasi GPS tidak terkini. Tekan LOKASI SAYA untuk mendapatkan lokasi baharu.","error");
+ return;
+}
  if(!destination){setStatus("Cari dan pilih destinasi dahulu.","error");return;}
  $("routeBtn").disabled=true;setStatus("Sedang mengira laluan…");
  try{
   const c=`${currentPosition.lon},${currentPosition.lat};${destination.lon},${destination.lat}`;
   const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+c+"?overview=full&geometries=geojson&steps=true");
   if(!r.ok)throw Error("Perkhidmatan laluan tidak tersedia buat sementara waktu.");
-  const d=await r.json();if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
-  const route=d.routes[0];if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.geoJSON(route.geometry,{style:{color:"#ffb52e",weight:6,opacity:.92}}).addTo(map);map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
+  const d=await r.json();
+   if(requestId!==routeRequestId)return;
+   if(d.code!=="Ok"||!d.routes?.length)throw Error("Laluan memandu tidak ditemui untuk lokasi ini.");
+  const route=d.routes[0];
+   if(!route.geometry||!Array.isArray(route.geometry.coordinates)||route.geometry.coordinates.length<2){
+ throw Error("Geometri laluan tidak sah.");
+}
+   const newLayer=L.geoJSON(route.geometry,{  style:{color:"#ffb52e",weight:6,opacity:.92} }).addTo(map);  if(routeLayer)map.removeLayer(routeLayer);  routeLayer=newLayer; activeRouteCoordinates=route.geometry.coordinates; offRouteCount=0; routeProgressIndex=0;if(!isAutomatic){
+  map.fitBounds(newLayer.getBounds(),{padding:[28,28]});
+}
   const km=route.distance/1000,mins=Math.round(route.duration/60),time=mins<60?mins+" min":Math.floor(mins/60)+" jam "+mins%60+" min";
   summaryEl.innerHTML='<div class="route-title">LALUAN DIJUMPAI</div><div>'+esc(destination.name)+'</div><div class="route-stats"><span class="stat">Jarak: '+km.toFixed(1)+' km</span><span class="stat">Anggaran: '+time+'</span></div><div style="margin-top:8px;font-size:12px">Anggaran sahaja; trafik semasa belum diambil kira.</div><div style="margin-top:12px;font-weight:800">ARAHAN LALUAN</div><ol id="routeSteps" style="margin:8px 0 0;padding-left:22px"></ol>';
    const stepsList=$("routeSteps");
@@ -355,8 +551,8 @@ steps.forEach((step,i)=>{
 });
 });
   summaryEl.hidden=false;setStatus("Laluan berjaya dipaparkan pada peta.","success");
- }catch(e){setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error");}
- finally{$("routeBtn").disabled=!currentPosition||!destination;}
+ }catch(e){if(requestId===routeRequestId)setStatus((e.message||"Gagal mengira laluan.")+" Anda masih boleh membuka navigasi dalam Apple Maps atau Google Maps.","error");}
+ finally{if(requestId===routeRequestId){isRerouting=false;$("routeBtn").disabled=!currentPosition||!destination;}}
 }
 function openExternal(provider){
  if(!destination){setStatus("Cari destinasi dahulu.","error");return;}
@@ -384,7 +580,24 @@ function saveFavorite(){
  items.unshift({label,name:destination.name,display_name:destination.display_name,lat:destination.lat,lon:destination.lon});
  if(writeFavorites(items.slice(0,20))){$("favoriteName").value="";renderFavorites();setStatus("“"+label+"” disimpan dalam lokasi kegemaran pada peranti ini.","success");}
 }
-function clearRoute(){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}summaryEl.hidden=true;setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");}
+function clearRoute(){
+  routeRequestId++;
+ if(routeLayer){
+  map.removeLayer(routeLayer);
+  routeLayer=null;
+ }
+ activeRouteCoordinates=[];
+routeProgressIndex=0;
+ offRouteCount=0;
+ lastRerouteAt=0;
+  isRerouting=false;
+ navigationSteps=[];
+ currentStepIndex=0;
+ updateNavigation.pendingStep=null;
+ updateNavigation.pendingCount=0;
+ summaryEl.hidden=true;
+ setStatus("Laluan dipadam. Destinasi dan lokasi semasa masih disimpan pada peta.");
+}
 $("searchBtn").addEventListener("click",searchDestination);$("nearbyBtn").addEventListener("click",nearbyPlaces);
 $("destination").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();searchDestination();}});
 $("destination").addEventListener("input",()=>{
