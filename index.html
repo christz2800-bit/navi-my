@@ -340,7 +340,21 @@ gpsAvailable=true;
 
  },e=>{
    gpsAvailable=false;
-offRouteCount=0;
+   lastGpsFixAt=0;
+   currentPosition=null;
+   nearbySearchCenter=null;
+   offRouteCount=0;
+   routeRequestId++;
+   isRerouting=false;
+
+   if(userMarker){
+    map.removeLayer(userMarker);
+    userMarker=null;
+   }
+
+   $("routeBtn").disabled=true;
+   $("nearbyBtn").disabled=true;
+
   setStatus(
    e.code===1
     ?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari."
