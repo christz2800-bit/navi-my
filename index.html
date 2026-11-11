@@ -230,8 +230,9 @@ function showDestinationMarker(){
  destinationMarker.bindPopup(popupContent(),{
   maxWidth:360,
   maxHeight:260,
-  autoPan:false,
-keepInView:false,
+  autoPan:true,
+  autoPanPadding:[20,20],
+  keepInView:true,
   closeOnClick:false
 });destinationMarker.on("dragend",updateDestinationFromMarker);
 }
