@@ -214,7 +214,7 @@ function updateDestinationFromMarker(){
  destination.name="Lokasi pilihan";destination.display_name="Lokasi pilihan (pin manual) — "+p.lat.toFixed(6)+", "+p.lng.toFixed(6);
  destinationMarker.setPopupContent(popupContent());destinationMarker.closePopup();$("destination").value=destination.name;
  $("routeBtn").disabled=!currentPosition;$("appleBtn").disabled=false;$("googleBtn").disabled=false;summaryEl.hidden=true;
- if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
+ clearRoute();
  setStatus("Pin dialihkan. Koordinat tepat telah dikemas kini. Sedang cuba mengenal pasti nama/alamat di lokasi baharu…","success");
  reverseGeocode(p.lat,p.lng).then(item=>{
   if(requestId!==reverseRequest||!destination)return;
@@ -323,21 +323,20 @@ gpsAvailable=true;
   );
 
   if(firstFix){
-   map.setView([currentPosition.lat,currentPosition.lon],15);
-   userMarker.openPopup();
-   firstFix=false;
-  }
-
-  $("routeBtn").disabled=!destination;
+  map.setView([currentPosition.lat,currentPosition.lon],15);
+  userMarker.openPopup();
 
   setStatus(
-   "Lokasi diperoleh. Anggaran ketepatan GPS: "+
-   Math.round(currentPosition.accuracy)+" meter.",
-   "success"
+    "Lokasi diperoleh. Anggaran ketepatan GPS: "+
+    Math.round(currentPosition.accuracy)+" meter.",
+    "success"
   );
 
-  $("locateBtn").disabled=false;
+  firstFix=false;
+}
 
+$("routeBtn").disabled=!destination;
+$("locateBtn").disabled=false;
  },e=>{
    gpsAvailable=false;
    lastGpsFixAt=0;
@@ -531,6 +530,8 @@ const turnNames={
 };
    navigationSteps=[];
 currentStepIndex=0;
+   updateNavigation.pendingStep=null;
+updateNavigation.pendingCount=0;
 steps.forEach((step,i)=>{
   const li=document.createElement("li");
   const m=step.maneuver||{};
