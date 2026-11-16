@@ -109,6 +109,7 @@ let currentPosition=null,destination=null;
 let routeProgressIndex=0;
 let nearbySearchCenter=null;
 let destinationMarker=null,userMarker=null,routeLayer=null,searchTimer=null,reverseRequest=0,watchId=null;
+  let gpsRetryTimer=null,gpsWatchGeneration=0;
   let navigationSteps=[],currentStepIndex=0;
   let activeRouteCoordinates=[],offRouteCount=0,lastRerouteAt=0,isRerouting=false,routeRequestId=0;
 const STORAGE_KEY="navimy_favorites_v04";
@@ -282,23 +283,47 @@ function chooseDestination(item){
  setStatus("Destinasi dipilih: "+destination.display_name+". Semak kedudukan pin. Jika pin tidak tepat, seret ke pintu masuk yang dikehendaki; koordinat pin akan digunakan untuk laluan.");
 }
 
+
 function locateMe(){
-  if(!navigator.geolocation){
-   setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");
-   return;
-  }
+ if(!navigator.geolocation){
+  setStatus("Pelayar ini tidak menyokong lokasi GPS.","error");
+  return;
+ }
 
-  $("locateBtn").disabled=true;
-  setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+ $("locateBtn").disabled=false;
 
-  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+ if(gpsRetryTimer!==null){
+  clearTimeout(gpsRetryTimer);
+  gpsRetryTimer=null;
+ }
 
-  let firstFix=true;
-  let hadGpsError=false;
+ if(watchId!==null){
+  navigator.geolocation.clearWatch(watchId);
+  watchId=null;
+ }
+
+ const generation=++gpsWatchGeneration;
+ let firstFix=true;
+ let hadGpsError=false;
+ let retryCount=0;
+
+ const retryDelays=[3000,6000,12000,20000,30000];
+
+ setStatus("Meminta lokasi GPS… Pastikan kebenaran lokasi dibenarkan untuk Safari.");
+
+ function startWatch(){
+  if(generation!==gpsWatchGeneration)return;
 
   watchId=navigator.geolocation.watchPosition(p=>{
+   if(generation!==gpsWatchGeneration)return;
+
    const recovering=hadGpsError;
    const isFirstFix=firstFix;
+
+   if(gpsRetryTimer!==null){
+    clearTimeout(gpsRetryTimer);
+    gpsRetryTimer=null;
+   }
 
    currentPosition={
     lat:p.coords.latitude,
@@ -309,6 +334,7 @@ function locateMe(){
    lastGpsFixAt=Date.now();
    gpsAvailable=true;
    hadGpsError=false;
+   retryCount=0;
 
    nearbySearchCenter={
     lat:currentPosition.lat,
@@ -354,42 +380,87 @@ function locateMe(){
    $("locateBtn").disabled=false;
 
   },e=>{
+   if(generation!==gpsWatchGeneration)return;
+
    const firstError=!hadGpsError;
+   hadGpsError=true;
+
+   if(watchId!==null){
+    navigator.geolocation.clearWatch(watchId);
+    watchId=null;
+   }
 
    gpsAvailable=false;
    lastGpsFixAt=0;
-   currentPosition=null;
-   nearbySearchCenter=null;
+    currentPosition=null;
+nearbySearchCenter=null;
    offRouteCount=0;
    routeRequestId++;
    isRerouting=false;
-   hadGpsError=true;
 
    if(userMarker){
-    userMarker.setPopupContent("Lokasi terakhir diketahui. GPS belum tersedia.");
+    userMarker.setPopupContent(
+     "Lokasi terakhir diketahui. GPS belum tersedia."
+    );
    }
 
    $("routeBtn").disabled=true;
    $("nearbyBtn").disabled=!destination;
+   $("locateBtn").disabled=false;
+
+   if(e.code===1){
+    if(gpsRetryTimer!==null){
+     clearTimeout(gpsRetryTimer);
+     gpsRetryTimer=null;
+    }
+
+    setStatus(
+     "Kebenaran lokasi ditolak. Semak tetapan lokasi Safari.",
+     "error"
+    );
+    return;
+   }
 
    if(firstError){
     setStatus(
-     e.code===1
-      ?"Kebenaran lokasi ditolak. Semak tetapan lokasi Safari."
-      :e.code===2
-       ?"Lokasi GPS sementara tidak tersedia. Menunggu bacaan seterusnya…"
-       :"GPS mengambil masa terlalu lama. Menunggu bacaan seterusnya…",
+     e.code===2
+      ?"Lokasi GPS sementara tidak tersedia. Mencuba pemulihan…"
+      :"GPS mengambil masa terlalu lama. Mencuba pemulihan…",
      "error"
     );
    }
 
-   $("locateBtn").disabled=false;
+   if(retryCount>=retryDelays.length){
+    setStatus(
+     "GPS belum pulih selepas 5 cubaan. Tekan LOKASI SAYA untuk cuba semula.",
+     "error"
+    );
+    return;
+   }
+
+   const delay=retryDelays[retryCount];
+   retryCount++;
+
+   gpsRetryTimer=setTimeout(()=>{
+    gpsRetryTimer=null;
+
+    if(generation!==gpsWatchGeneration)return;
+
+    setStatus(
+     "Mencuba memulihkan GPS ("+retryCount+"/5)…"
+    );
+
+    startWatch();
+   },delay);
 
   },{
    enableHighAccuracy:true,
    timeout:15000,
    maximumAge:10000
   });
+ }
+
+ startWatch();
 }
   
 function updateNavigation(position){
